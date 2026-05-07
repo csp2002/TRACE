@@ -107,7 +107,7 @@ def trainer_synapse(args, model, snapshot_path):
             # print('label:', label_batch.shape, label_batch.max(), label_batch.min())
             # raise Exception
             
-            if args.exp_name == 'TU' or args.exp_name == 'medformer' or args.exp_name == 'attention_unet' or args.exp_name == 'unetpp' or args.exp_name == 'swin_unet' or args.exp_name == 'FAT_Net' or args.exp_name == 'H2Former' or args.exp_name == 'MISSFormer':
+            if args.exp_name == 'transunet' or args.exp_name == 'medformer' or args.exp_name == 'attention_unet' or args.exp_name == 'unetpp' or args.exp_name == 'swin_unet' or args.exp_name == 'FAT_Net' or args.exp_name == 'H2Former' or args.exp_name == 'MISSFormer':
                 outputs = model(image_batch)  #used in the original 2D baseline models
             # elif not args.has_confidence:
             #     outputs = model(image_batch, ref_image_batch, ref_mask_batch)  # bs,class_num,224,224, used when adding my two modules

@@ -78,10 +78,10 @@ Trained checkpoints are written to `./checkpoints/<exp_subdir>/...`; the test an
 
 ```bash
 # Baseline TransUNet on KiTS test set
-python -m tumor_seg.test --exp_name TU --dataset kits
+python -m tumor_seg.test --exp_name transunet --dataset kits
 
 # TransUNet + TRACE on KiTS test set
-python -m tumor_seg.test --exp_name v6.5.54 --dataset kits --test_ref neighbor
+python -m tumor_seg.test --exp_name transunet_ours --dataset kits --test_ref neighbor
 ```
 
 `tumor_seg/test.py` reports mean Dice and IoU over all test slices. Pass `--is_save` to additionally dump the predicted masks to `--test_save_dir`. The exact `--exp_name` strings and reference-protocol flags follow the same convention as `train.py`.

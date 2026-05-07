@@ -131,7 +131,7 @@ if __name__ == "__main__":
     
     if args.vit_name.find('R50') != -1:
         config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    if args.exp_name == 'TU':
+    if args.exp_name == 'transunet':
         net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
     # elif not args.has_confidence :
     #     net = My_ViT_seg2(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
@@ -166,15 +166,13 @@ if __name__ == "__main__":
     #     config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
     #     net = My_ViT_seg_v10(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
     #     print('Using My_ViT_seg_v10')
-    elif 'v6.5.' in args.exp_name:
-        exp_num = args.exp_name.split('.')[-1]
+    elif args.exp_name == 'transunet_ours':
         config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
         config_small.n_classes = args.num_classes
         config_small.n_skip = args.n_skip
         config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-        net_name = 'My_ViT_seg_v65' + exp_num
-        net = eval(net_name)(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-        print('Using ' + net_name)
+        net = My_ViT_seg_v6554(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
+        print('Using TransUNet + TRACE')
     elif args.exp_name == 'medformer':
         print('Using medformer baseline model')
         net = MedFormer(in_chan=1, num_classes=args.num_classes).cuda()
@@ -233,7 +231,7 @@ if __name__ == "__main__":
         # net = My_ViT_seg_v2(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
         raise Exception('Invalid experiment name, cannot find appropriate model')
 
-    if args.exp_name == 'TU' or args.exp_name == 'v6.5.54' :  #for transunet
+    if args.exp_name == 'transunet' or args.exp_name == 'transunet_ours' :  #for transunet
         net.load_from(weights=np.load(config_vit.pretrained_path))
         
     num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module' in name )

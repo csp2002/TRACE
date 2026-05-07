@@ -1004,7 +1004,7 @@ if __name__ == "__main__":
 
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "TU_" + args.dataset + "224",
+            "transunet_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1012,7 +1012,7 @@ if __name__ == "__main__":
 
         ckpt_path2 = os.path.join(
             "./checkpoints/",
-            "v6.5.54_neighbor_" + args.dataset + "224",
+            "transunet_ours_neighbor_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model2.load_state_dict(torch.load(ckpt_path2))
