@@ -4,8 +4,6 @@ This repository does **not** redistribute datasets or pretrained checkpoints. Th
 
 ## 1. Datasets
 
-### 1.1 Publicly available
-
 | Dataset | Source | Notes |
 |---|---|---|
 | **KiTS** | [https://kits-challenge.org/kits23/](https://kits-challenge.org/kits23/) | KiTS23 challenge data; kidney tumors |
@@ -14,10 +12,6 @@ This repository does **not** redistribute datasets or pretrained checkpoints. Th
 | **MSD-Colon** | [http://medicaldecathlon.com/](http://medicaldecathlon.com/) | Medical Segmentation Decathlon, Task 10 |
 
 After downloading, you should have one folder per dataset containing volumetric NIfTI files (`*.nii.gz`) for both CT volumes and segmentation masks.
-
-### 1.2 In-house cohort ("Local")
-
-The "Local" dataset used in our paper is a private brain-tumor MRI/CT cohort collected under an IRB-approved protocol. We are unable to redistribute it. Researchers wishing to reproduce the in-house results should obtain similar data through their own institutional channels.
 
 ## 2. Data preprocessing pipeline
 
@@ -54,7 +48,7 @@ The resulting layout is:
 
 ```
 2D_data/
-└── <dataset>/                e.g. kits, lits, pancreas, colon, local
+└── <dataset>/                e.g. kits, lits, pancreas, colon
     ├── train/
     │   ├── CT/<patient_id>/<slice_idx>.png
     │   └── Mask/<patient_id>/<slice_idx>.png
@@ -70,11 +64,11 @@ The simulation framework needs to know which slice acts as the "reference" for e
 ```bash
 # Middle-slice protocol: pick the slice with the largest GT mask
 python -m data_preparation.extract_middle_slice \
-    --root ./2D_data --datasets kits lits pancreas colon local
+    --root ./2D_data --datasets kits lits pancreas colon
 
 # Neighbor-slice protocol: middle slice + previous-slice fallbacks
 python -m data_preparation.extract_neighbor_slice \
-    --root ./2D_data --datasets kits lits pancreas colon local
+    --root ./2D_data --datasets kits lits pancreas colon
 ```
 
 These produce JSON files (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`) consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
@@ -116,10 +110,6 @@ For up-to-date download URLs, see the upstream README of each project.
 
 ## 5. Trained TRACE checkpoints
 
-We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 5 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
+We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 4 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
 
 The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; refer to the dispatch logic inside `simulation.py` for the exact subdirectory naming convention (`TU_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
-
-## 6. Patient exclusion
-
-The original paper excludes one patient (an outlier in the in-house cohort) from all simulations. The `--exclude-patients` flag of `tumor_seg/simulation.py` and `tumor_seg/edit_workload.py` accepts a quoted string of comma-separated patient IDs to drop at runtime; the released defaults pass an empty string.

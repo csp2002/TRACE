@@ -1,15 +1,15 @@
-# HCI simulation v3:
+# HCI simulation:
 # - Support traditional 2D segmentation models (TransUNet, MedFormer, etc.)
 # - Support MedSAM and MedSAM2 models
-# - Always use GT as final mask (simulate clinicians modify every slice, even for accepted ones)
+# - Always use GT as final mask (simulate clinicians modifying every slice, even accepted ones)
 # - Sweep thresholds and plot reject rate vs threshold
-# - Support two AI modes:
+# - Two AI modes:
 #     Mode A: per-slice prediction with model1(img) only
 #     Mode B: ref-conditioned prediction with model2(img, ref_img, ref_gt_mask)['final']
-# - strategy/option:
-#     1: neighbor reference (prev slice)
-#     2: last GT reference (last rejected slice, starting from center)
-#     3: neighbor reference (prediction if accepted, GT if rejected)
+# - Reference protocol (Mode B): for each slice, condition on the previous slice.
+#   The reference mask is the AI's prediction if that previous slice was
+#   accepted by the clinician, otherwise the ground-truth mask the clinician
+#   produced after rejecting it.
 
 import os, json
 import sys
@@ -354,7 +354,6 @@ class DoctorSimTester:
         model1,
         model2,
         threshold: float,
-        strategy: int,
         save_root: str,
         device: str = "cuda",
         img_size: int = 224,
@@ -366,7 +365,6 @@ class DoctorSimTester:
         self.m1 = model1.eval().to(device)
         self.m2 = model2.eval().to(device)
         self.th = float(threshold)
-        self.strategy = int(strategy)
         self.save_root = save_root
         self.dev = device
         self.size = img_size
@@ -426,7 +424,6 @@ class DoctorSimTester:
         summary = {
             "ai_mode": self.ai_mode,
             "threshold": self.th,
-            "strategy": self.strategy,
             "excluded_patients": exclude,
             "total_manual_corrections": int(total_fix),
             "first_manual_corrections": int(first_manual),
@@ -484,7 +481,6 @@ class DoctorSimTester:
 
         manual = 0
         first_manual = 0
-        last_gt_idx = center
 
         # ---- Mode A: every slice uses model1(img) ----
         if self.ai_mode == "A":
@@ -536,12 +532,10 @@ class DoctorSimTester:
             if not acc:
                 manual += 1
                 first_manual += 1
-            if (not acc) or (self.strategy == 2):
-                last_gt_idx = center
 
             # Process right side first (center+1 to n-1)
             for r in range(center + 1, n):
-                ref = self._choose_ref(r, r - 1, last_gt_idx)
+                ref = r - 1
                 _, acc_r = self._infer_slice(
                     idx=r,
                     ct_dir=ct_dir,
@@ -558,11 +552,10 @@ class DoctorSimTester:
                 accepted_status[r] = acc_r
                 if not acc_r:
                     manual += 1
-                    last_gt_idx = r
 
             # Process left side (center-1 to 0)
             for l in range(center - 1, -1, -1):
-                ref = self._choose_ref(l, l + 1, last_gt_idx)
+                ref = l + 1
                 _, acc_l = self._infer_slice(
                     idx=l,
                     ct_dir=ct_dir,
@@ -579,7 +572,6 @@ class DoctorSimTester:
                 accepted_status[l] = acc_l
                 if not acc_l:
                     manual += 1
-                    last_gt_idx = l
 
         # averages -- all model types now store masks at ORIGINAL resolution
         avg_initial_dice = float(
@@ -612,14 +604,6 @@ class DoctorSimTester:
             "avg_final_dice": avg_final_dice,
             "first_manual": first_manual,
         }
-
-    # ---------------- helper: choose reference --------------
-    def _choose_ref(self, tgt_idx: int, prev_idx: int, last_gt_idx: int) -> int:
-        # option 1: neighbor; option 2: last rejected (last GT); option 3: neighbor (but mask depends on accept status)
-        if self.strategy == 2:
-            return last_gt_idx
-        else:  # option 1 or 3: use neighbor
-            return prev_idx
 
     # ---------- helper: run inference + doctor decision -----
     def _infer_slice(
@@ -659,17 +643,10 @@ class DoctorSimTester:
 
                 ref_img_np = _prep_img(ref_ct, self.size)
 
-                # Choose reference mask based on strategy
-                # Use final_mask (which is GT) for ref_mk, but for option 3, if accepted, use prediction
-                if self.strategy == 3:
-                    # Option 3: use prediction if ref was accepted, GT if ref was rejected
-                    if accepted_status[ref_idx]:
-                        ref_mk_np = initial_masks[ref_idx]
-                    else:
-                        # Option 3: use GT if ref was rejected (final_mask is GT)
-                        ref_mk_np = final_masks[ref_idx]
+                # Reference mask: prediction if ref slice was accepted, else GT.
+                if accepted_status[ref_idx]:
+                    ref_mk_np = initial_masks[ref_idx]
                 else:
-                    # Option 1 or 2: always use final_mask (which is GT)
                     ref_mk_np = final_masks[ref_idx]
 
                 # ref_mk_np is stored at original resolution; resize to self.size for model input
@@ -717,22 +694,13 @@ class DoctorSimTester:
             
             # Get box prompt
             if need_ref:
-                # Mode B: use reference slice's final_mask for box_prompt
-                # final_mask is always GT, but in option 3, if ref was accepted, we should use prediction
-                if self.strategy == 3:
-                    if accepted_status[ref_idx]:
-                        # Option 3: use accepted prediction if ref was accepted
-                        ref_mask_for_box = initial_masks[ref_idx]
-                        ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
-                    else:
-                        # Option 3: use GT if ref was rejected (final_mask is GT)
-                        ref_mask_for_box = final_masks[ref_idx]
-                        ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
+                # Reference mask for box_prompt: prediction if ref slice was accepted, else GT.
+                if accepted_status[ref_idx]:
+                    ref_mask_for_box = initial_masks[ref_idx]
                 else:
-                    # Option 1 or 2: always use final_mask (which is GT)
                     ref_mask_for_box = final_masks[ref_idx]
-                    ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
-                
+                ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
+
                 box_prompt = medsam_extract_box_from_mask(ref_mask_uint8)
                 
                 # MedSAM_v6554 (model2): direct forward call
@@ -743,17 +711,10 @@ class DoctorSimTester:
                 ref_img_1024_tensor, _, _ = medsam_prep_img(ref_ct_path)
                 ref_img_1024_tensor = ref_img_1024_tensor.to(self.dev)
                 
-                # Prepare reference mask (1024x1024)
-                # Choose reference mask based on strategy
-                if self.strategy == 3:
-                    if accepted_status[ref_idx]:
-                        # Option 3: use accepted prediction if ref was accepted
-                        ref_mask_np = initial_masks[ref_idx]
-                    else:
-                        # Option 3: use GT if ref was rejected (final_mask is GT)
-                        ref_mask_np = final_masks[ref_idx]
+                # Reference mask (1024×1024): prediction if ref slice was accepted, else GT.
+                if accepted_status[ref_idx]:
+                    ref_mask_np = initial_masks[ref_idx]
                 else:
-                    # Option 1 or 2: always use final_mask (which is GT)
                     ref_mask_np = final_masks[ref_idx]
                 
                 # Resize ref_mask to 1024x1024
@@ -836,22 +797,14 @@ class DoctorSimTester:
             
             # Get box prompt
             if need_ref:
-                # Mode B: use reference slice's final_mask for box_prompt
-                # final_mask is always GT, but in option 3, if ref was accepted, we should use prediction
-                if self.strategy == 3:
-                    if accepted_status[ref_idx]:
-                        # Option 3: use accepted prediction if ref was accepted
-                        ref_mask_for_box = initial_masks[ref_idx]
-                        if ref_mask_for_box.max() <= 1.0:
-                            ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
-                        else:
-                            ref_mask_uint8 = ref_mask_for_box.astype(np.uint8)
-                    else:
-                        # Option 3: use GT if ref was rejected (final_mask is GT)
-                        ref_mask_for_box = final_masks[ref_idx]
+                # Reference mask for box_prompt: prediction if ref slice was accepted, else GT.
+                if accepted_status[ref_idx]:
+                    ref_mask_for_box = initial_masks[ref_idx]
+                    if ref_mask_for_box.max() <= 1.0:
                         ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
+                    else:
+                        ref_mask_uint8 = ref_mask_for_box.astype(np.uint8)
                 else:
-                    # Option 1 or 2: always use final_mask (which is GT)
                     ref_mask_for_box = final_masks[ref_idx]
                     ref_mask_uint8 = (ref_mask_for_box * 255).astype(np.uint8)
                 
@@ -882,17 +835,10 @@ class DoctorSimTester:
                 # Prepare reference image
                 ref_img_rgb, _, _ = medsam2_prep_img(ref_ct_path)
                 
-                # Choose reference mask based on strategy
-                # Use final_mask (which is GT) for ref_gt_tensor, but for option 3, if accepted, use prediction
-                if self.strategy == 3:
-                    if accepted_status[ref_idx]:
-                        # Option 3: use accepted prediction if ref was accepted
-                        ref_mask_np = initial_masks[ref_idx]
-                    else:
-                        # Option 3: use GT if ref was rejected (final_mask is GT)
-                        ref_mask_np = final_masks[ref_idx]
+                # Reference mask: prediction if ref slice was accepted, else GT.
+                if accepted_status[ref_idx]:
+                    ref_mask_np = initial_masks[ref_idx]
                 else:
-                    # Option 1 or 2: always use final_mask (which is GT)
                     ref_mask_np = final_masks[ref_idx]
                 
                 # Resize images and masks to 512x512 for model input
@@ -993,9 +939,6 @@ if __name__ == "__main__":
         default=[0.70, 0.75, 0.80, 0.85, 0.90, 0.95],
         help="Space-separated thresholds, e.g. --thresholds 0.7 0.75 0.8 0.85 0.9 0.95",
     )
-    parser.add_argument("--option", type=int, default=1, choices=[1, 2, 3],
-                        help="1: neighbor reference (GT), 2: last GT reference, 3: neighbor reference (prediction if accepted, GT if rejected) (Mode B only)")
-
     parser.add_argument(
         "--exclude-patients",
         type=str,
@@ -1351,14 +1294,14 @@ if __name__ == "__main__":
     thresholds = [float(x) for x in args.thresholds]
     ai_modes = ["A", "B"]
 
-    option_dir = os.path.join(args.save_path, args.model_name, "option" + str(args.option), args.dataset)
-    os.makedirs(option_dir, exist_ok=True)
+    out_dir = os.path.join(args.save_path, args.model_name, args.dataset)
+    os.makedirs(out_dir, exist_ok=True)
 
     results = {m: {"reject_rates": [], "total_slices": [], "total_rejects": []} for m in ai_modes}
 
     for th in thresholds:
         for m in ai_modes:
-            th_dir = os.path.join(option_dir, f"mode{m}", f"{th:.2f}")
+            th_dir = os.path.join(out_dir, f"mode{m}", f"{th:.2f}")
             os.makedirs(th_dir, exist_ok=True)
 
             tester = DoctorSimTester(
@@ -1366,7 +1309,6 @@ if __name__ == "__main__":
                 model1=model1,
                 model2=model2,
                 threshold=th,
-                strategy=args.option,
                 save_root=th_dir,
                 device="cuda",
                 img_size=img_size,
@@ -1386,13 +1328,12 @@ if __name__ == "__main__":
     curve_json = {
         "model_name": args.model_name,
         "dataset": args.dataset,
-        "option": args.option,
         "thresholds": thresholds,
         "exclude_patients": exclude_patients,
         "modeA": results["A"],
         "modeB": results["B"],
     }
-    with open(os.path.join(option_dir, "reject_rate_vs_threshold.json"), "w") as f:
+    with open(os.path.join(out_dir, "reject_rate_vs_threshold.json"), "w") as f:
         json.dump(curve_json, f, indent=2)
 
     # -------- plot (two lines) --------

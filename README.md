@@ -3,7 +3,7 @@
 ## 1. Repository layout
 
 ```
-tumor-seg-trace/
+TRACE_github/
 ├── data_preparation/
 │   ├── nifti_to_2d.py
 │   ├── extract_middle_slice.py
@@ -31,8 +31,8 @@ tumor-seg-trace/
 ## 2. Installation
 
 ```bash
-git clone <this-repo> tumor-seg-trace
-cd tumor-seg-trace
+git clone https://github.com/csp2002/TRACE_github.git
+cd TRACE_github
 
 # Environment for the 7 conventional models + simulation framework
 conda env create -f TRACE.yaml
@@ -44,9 +44,9 @@ For the **MedSAM** and **MedSAM2** environments, please follow the installation 
 
 ## 3. Data and pretrained weights
 
-This repository does **not** redistribute datasets or pretrained checkpoints. See [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for:
+See [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for:
 
-- Download links for the four publicly available CT datasets (KiTS, LiTS, MSD-Pancreas, MSD-Colon) and notes on the in-house "Local" cohort.
+- Download links for the four publicly available CT datasets (KiTS, LiTS, MSD-Pancreas, MSD-Colon).
 - The full preprocessing pipeline (NIfTI → 2D PNG slices → reference-slice annotations).
 - Where to place the ImageNet-pretrained backbone weights (TransUNet R50+ViT-B, SwinUNet, ResNet-34) and the MedSAM / MedSAM2 vendor weights.
 - Notes on trained TRACE checkpoint layout and patient exclusion.
@@ -82,16 +82,12 @@ Two parallel components implement our slice-by-slice clinician–AI collaboratio
 python -m tumor_seg.simulation \
     --model_name TransUNet \
     --dataset kits \
-    --option 3 \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
 
-Iterate over the 5 datasets (`kits`, `lits`, `pancreas`, `colon`, `local`) and the 9 backbones (`TransUNet`, `MedFormer`, `AttentionUNet`, `UNetPlusPlus`, `SwinUnet`, `FAT_Net`, `H2Former`, `MedSAM`, `MedSAM2`) to reproduce all reported simulation results.
+For each slice in the test volume the AI's prediction is compared against the clinician's ground truth at the chosen Dice threshold; if the metric falls below the threshold the slice is "rejected" and the clinician's mask is used as the reference for the next slice, otherwise the AI prediction itself is the reference. The driver sweeps the threshold list, computes the rejection rate for both Mode A (no reference) and Mode B (TRACE-conditioned), and writes a JSON curve.
 
-Reference-protocol options (`--option`):
-1. **Neighbor reference** — previous slice's prediction conditions current slice
-2. **Last GT reference** — last rejected slice's GT conditions current slice (centred)
-3. **Conditional neighbor** — use prediction if accepted, GT if rejected
+Iterate over the 4 datasets (`kits`, `lits`, `pancreas`, `colon`) and the 9 backbones (`TransUNet`, `MedFormer`, `AttentionUNet`, `UNetPlusPlus`, `SwinUnet`, `FAT_Net`, `H2Former`, `MedSAM`, `MedSAM2`) to reproduce all reported simulation results.
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 
