@@ -1,10 +1,6 @@
-#created by csp, store the codes for different models and datasets
-
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-
-join = os.path.join
 from tqdm import tqdm
 from skimage import transform
 import torch
@@ -25,66 +21,6 @@ from PIL import Image
 import math
 import copy
 from vit_seg_modeling_resnet_skip import ResNetV2, ResNetV3
-
-
-class NpyDataset(Dataset):
-    def __init__(self, data_root, bbox_shift=20):
-        self.data_root = data_root
-        self.gt_path = join(data_root, "gts")
-        self.img_path = join(data_root, "imgs")
-        self.gt_path_files = sorted(
-            glob.glob(join(self.gt_path, "**/*.npy"), recursive=True)
-        )
-        self.gt_path_files = [
-            file
-            for file in self.gt_path_files
-            if os.path.isfile(join(self.img_path, os.path.basename(file)))
-        ]
-        self.bbox_shift = bbox_shift
-        print(f"number of images: {len(self.gt_path_files)}")
-
-    def __len__(self):
-        return len(self.gt_path_files)
-
-    def __getitem__(self, index):
-        # load npy image (1024, 1024, 3), [0,1]
-        img_name = os.path.basename(self.gt_path_files[index])
-        img_1024 = np.load(
-            join(self.img_path, img_name), "r", allow_pickle=True
-        )  # (1024, 1024, 3)
-        # convert the shape to (3, H, W)
-        img_1024 = np.transpose(img_1024, (2, 0, 1))
-        assert (
-            np.max(img_1024) <= 1.0 and np.min(img_1024) >= 0.0
-        ), "image should be normalized to [0, 1]"
-        gt = np.load(
-            self.gt_path_files[index], "r", allow_pickle=True
-        )  # multiple labels [0, 1,4,5...], (256,256)
-        assert img_name == os.path.basename(self.gt_path_files[index]), (
-            "img gt name error" + self.gt_path_files[index] + self.npy_files[index]
-        )
-        label_ids = np.unique(gt)[1:]
-        gt2D = np.uint8(
-            gt == random.choice(label_ids.tolist())
-        )  # only one label, (256, 256)
-        assert np.max(gt2D) == 1 and np.min(gt2D) == 0.0, "ground truth should be 0, 1"
-        y_indices, x_indices = np.where(gt2D > 0)
-        x_min, x_max = np.min(x_indices), np.max(x_indices)
-        y_min, y_max = np.min(y_indices), np.max(y_indices)
-        # add perturbation to bounding box coordinates
-        H, W = gt2D.shape
-        x_min = max(0, x_min - random.randint(0, self.bbox_shift))
-        x_max = min(W, x_max + random.randint(0, self.bbox_shift))
-        y_min = max(0, y_min - random.randint(0, self.bbox_shift))
-        y_max = min(H, y_max + random.randint(0, self.bbox_shift))
-        bboxes = np.array([x_min, y_min, x_max, y_max])
-        return (
-            torch.tensor(img_1024).float(),
-            torch.tensor(gt2D[None, :, :]).long(),
-            torch.tensor(bboxes).float(),
-            img_name,
-        )
-    
 class Dataset_sli2vol(Dataset):   #use pseudo label as reference mask, the input only includes original image and reference/pseudo mask
     def __init__(self, base_dir, mode):
         
@@ -211,7 +147,6 @@ class Dataset_sli2vol(Dataset):   #use pseudo label as reference mask, the input
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-            
         # folder_name = os.path.dirname(mask_path)
         # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
         # with open(dict_path, 'r') as f:
@@ -224,8 +159,6 @@ class Dataset_sli2vol(Dataset):   #use pseudo label as reference mask, the input
         # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
         
        
-
-        
         # add perturbation to bounding box coordinates
         H, W = ref_mask_1024.shape
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
@@ -244,8 +177,6 @@ class Dataset_sli2vol(Dataset):   #use pseudo label as reference mask, the input
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-
-
 class Dataset_vol2flow(Dataset):   #use pseudo label as reference mask, the input only includes original image and reference/pseudo mask
     def __init__(self, base_dir, mode):
         
@@ -378,7 +309,6 @@ class Dataset_vol2flow(Dataset):   #use pseudo label as reference mask, the inpu
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-            
         # folder_name = os.path.dirname(mask_path)
         # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
         # with open(dict_path, 'r') as f:
@@ -391,8 +321,6 @@ class Dataset_vol2flow(Dataset):   #use pseudo label as reference mask, the inpu
         # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
         
        
-
-        
         # add perturbation to bounding box coordinates
         H, W = ref_mask_1024.shape
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
@@ -411,8 +339,6 @@ class Dataset_vol2flow(Dataset):   #use pseudo label as reference mask, the inpu
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-    
-
 class Dataset_v6(Dataset):   #use largest slice as reference, the input includes original and reference image
     def __init__(self, base_dir, mode):
         
@@ -545,7 +471,6 @@ class Dataset_v6(Dataset):   #use largest slice as reference, the input includes
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-            
         # folder_name = os.path.dirname(mask_path)
         # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
         # with open(dict_path, 'r') as f:
@@ -574,7 +499,6 @@ class Dataset_v6(Dataset):   #use largest slice as reference, the input includes
         ref_img_1024 = np.transpose(ref_img_1024, (2, 0, 1))
        
 
-        
         # add perturbation to bounding box coordinates
         H, W = ref_mask_1024.shape
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
@@ -594,7 +518,6 @@ class Dataset_v6(Dataset):   #use largest slice as reference, the input includes
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-
 class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middle slice as reference
     def __init__(self, base_dir, mode):
         
@@ -753,7 +676,6 @@ class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middl
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-            
         # folder_name = os.path.dirname(mask_path)
         # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
         # with open(dict_path, 'r') as f:
@@ -782,7 +704,6 @@ class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middl
         ref_img_1024 = np.transpose(ref_img_1024, (2, 0, 1))
        
 
-        
         # add perturbation to bounding box coordinates
         H, W = ref_mask_1024.shape
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
@@ -802,9 +723,6 @@ class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middl
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-
-
-
 class Dataset_v8(Dataset):   #randomly choose another slice in the same volume as reference, the input includes original and reference image, the box prompt are extracted by vol2flow prediction of the original image
     def __init__(self, base_dir, mode):
         
@@ -897,7 +815,6 @@ class Dataset_v8(Dataset):   #randomly choose another slice in the same volume a
             ref_box_path = dict[folder_name]   
 
 
-
         # 当前slice的信息
         patient_ct_folder = os.path.dirname(image_path)
 
@@ -967,7 +884,6 @@ class Dataset_v8(Dataset):   #randomly choose another slice in the same volume a
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-            
         # folder_name = os.path.dirname(mask_path)
         # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
         # with open(dict_path, 'r') as f:
@@ -996,7 +912,6 @@ class Dataset_v8(Dataset):   #randomly choose another slice in the same volume a
         ref_img_1024 = np.transpose(ref_img_1024, (2, 0, 1))
        
 
-        
         # add perturbation to bounding box coordinates
         H, W = box_mask_1024.shape
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
@@ -1016,331 +931,6 @@ class Dataset_v8(Dataset):   #randomly choose another slice in the same volume a
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-
-
-class Dataset_v7(Dataset):   #randomly choose another slice in the same volume as reference, the input includes original and reference image, box prompt are extracted by the ref_mask
-    def __init__(self, base_dir, mode):
-        
-        # self.split = split
-        # self.sample_list = open(os.path.join(list_dir, self.split+'.txt')).readlines()
-        self.data_dir = base_dir
-        
-        self.dataset = base_dir.split('/')[-1]
-        self.mode = mode
-        self.bbox_shift = 20
-        self.image_paths, self.mask_paths = self._get_image_mask_paths()
-    
-    def _get_image_mask_paths(self):
-        image_paths = []
-        mask_paths = []
-        ct_dir = os.path.join(self.data_dir, self.mode, "CT")
-        # mask_dir = os.path.join(self.root_dir, "Mask")
-        
-        for patient_folder in os.listdir(ct_dir):
-            patient_ct_folder = os.path.join(ct_dir, patient_folder)
-            # patient_mask_folder = os.path.join(mask_dir, patient_folder)
-            for ct_filename in os.listdir(patient_ct_folder):
-                ct_path = os.path.join(patient_ct_folder, ct_filename)
-                mask_path = ct_path.replace('CT', 'Mask')
-                
-                if os.path.exists(mask_path):
-                    image_paths.append(ct_path)
-                    mask_paths.append(mask_path)
-        
-        return image_paths, mask_paths
-
-    def __len__(self):
-        return len(self.image_paths) 
-
-    def __getitem__(self, idx):
-        image_path = self.image_paths[idx]
-        mask_path = self.mask_paths[idx]
-        img_name = os.path.basename(image_path)
-        # print('image_path:', image_path)
-        # print('mask_path:', mask_path)
-        # raise Exception
-        # image = Image.open(image_path).convert("L")
-        # mask = Image.open(mask_path).convert("L")
-
-        image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
-        mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        # print('image:', image.shape, image.max(), image.min())
-        # print('mask:', mask.shape, mask.max(), mask.min())
-        # # print('image0:', image.shape, image.max(), image.min())
-        # normalize image and mask
-        # image = (image - image.min()) / (image.max() - image.min())
-        mask = mask / 255.0
-
-
-        x, y = image.shape
-        if len(image.shape) == 2:
-            img_3c = np.repeat(image[:, :, None], 3, axis=-1)
-        elif len(image.shape) == 3 and image.shape[2]==4:
-            img_3c = image[:,:,:3]
-        else:
-            img_3c = image
-        # if x != self.output_size[0] or y != self.output_size[1]:
-        img_1024 = transform.resize(
-            img_3c, (1024, 1024), order=3, preserve_range=True, anti_aliasing=True
-        ).astype(np.uint8)
-        img_1024 = (img_1024 - img_1024.min()) / np.clip(
-            img_1024.max() - img_1024.min(), a_min=1e-8, a_max=None
-        )  # normalize to [0, 1], (H, W, 3)
-        # convert the shape to (3, H, W)
-        img_1024 = np.transpose(img_1024, (2, 0, 1))
-        mask_1024 = transform.resize(
-                mask,
-                (1024,1024),
-                order=0,
-                preserve_range=True,
-                mode="constant",
-                anti_aliasing=False,
-            )
-        
-        case_num, slice_num = mask_path.split('/')[-2:]
-        # ref_mask_path = os.path.join('./Vol2Flow_me/codes/models',self.dataset,'Vol2Flow_depth:256_M:5_mse',self.dataset+'_result',self.dataset, self.mode, 'Mask',case_num,slice_num)
-        
-        # dict_path = os.path.join('./Vol2Flow_me/codes/models',self.dataset,'Vol2Flow_depth:256_M:5_mse','annotation_dict_'+self.mode+'.json')
-        # # ref_mask_path = os.path.join('./Sli2Vol/Sli2Vol_result', self.dataset, case_num, slice_num)
-        # # dict_path = os.path.join('./Sli2Vol/result', self.dataset+'_train', 'annotation_dict_'+self.mode+'.json')
-        # with open(dict_path, 'r') as f:
-        #     dict = json.load(f)
-        # folder_name = os.path.dirname(mask_path)
-        # # if not os.path.exists(ref_mask_path):
-        # ref_mask_path = dict[folder_name]
-        # 当前slice的信息
-        patient_ct_folder = os.path.dirname(image_path)
-
-        # 随机选择同病人下的另一个 slice 作为 reference
-        available_slices = [
-            f for f in os.listdir(patient_ct_folder)
-            if f != slice_num 
-        ]
-        # print('image_path:', image_path)
-        # print('available_slices:', available_slices)
-        # raise Exception
-        ref_filename = random.choice(available_slices)
-
-        ref_image_path = os.path.join(patient_ct_folder, ref_filename)
-        ref_mask_path = ref_image_path.replace("CT", "Mask")
-
-        
-        ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        # if ref_mask.max() == 0:
-        #     ref_mask_path = dict[folder_name]
-        #     ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        # ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
-        ref_mask = ref_mask / 255.0
-        ref_x, ref_y = ref_mask.shape
-        # ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
-        ref_mask_1024 = transform.resize(
-                ref_mask,
-                (1024,1024),
-                order=0,
-                preserve_range=True,
-                mode="constant",
-                anti_aliasing=False,
-            )
-        # print('ref_mask_1024:', ref_mask_path, ref_mask_1024.max(), ref_mask_1024.min())
-        # y_indices, x_indices = np.where(ref_mask_1024 > 0)
-        
-        y_indices, x_indices = np.where(ref_mask_1024 > 0)
-        # if len(y_indices) == 0 or len(x_indices) == 0:
-        #     ref_mask_path = dict[folder_name]
-        #     ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        # # ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
-        #     ref_mask = ref_mask / 255.0
-        #     ref_x, ref_y = ref_mask.shape
-        #     # ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
-        #     ref_mask_1024 = transform.resize(
-        #             ref_mask,
-        #             (1024,1024),
-        #             order=0,
-        #             preserve_range=True,
-        #             mode="constant",
-        #             anti_aliasing=False,
-        #         )
-        #     y_indices, x_indices = np.where(ref_mask_1024 > 0)
-            
-        x_min, x_max = np.min(x_indices), np.max(x_indices)
-        y_min, y_max = np.min(y_indices), np.max(y_indices)
-
-       
-            
-        # folder_name = os.path.dirname(mask_path)
-        # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
-        # with open(dict_path, 'r') as f:
-        #     dict = json.load(f)
-        # ref_mask_path = dict[folder_name]
-        # ref_image_path = ref_mask_path.replace('Mask', 'CT')
-        # print('ref_image_path:', ref_image_path)
-        # print('ref_mask_path:', ref_mask_path)
-        ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
-        
-        if len(ref_image.shape) == 2:
-            ref_img_3c = np.repeat(ref_image[:, :, None], 3, axis=-1)
-        elif len(ref_image.shape) == 3 and ref_image.shape[2]==4:
-            ref_img_3c = ref_image[:,:,:3]
-        else:
-            ref_img_3c = ref_image
-        # if x != self.output_size[0] or y != self.output_size[1]:
-        ref_img_1024 = transform.resize(
-            ref_img_3c, (1024, 1024), order=3, preserve_range=True, anti_aliasing=True
-        ).astype(np.uint8)
-        ref_img_1024 = (ref_img_1024 - ref_img_1024.min()) / np.clip(
-            ref_img_1024.max() - ref_img_1024.min(), a_min=1e-8, a_max=None
-        )  # normalize to [0, 1], (H, W, 3)
-        # convert the shape to (3, H, W)
-        ref_img_1024 = np.transpose(ref_img_1024, (2, 0, 1))
-       
-
-        
-        # add perturbation to bounding box coordinates
-        H, W = ref_mask_1024.shape
-        x_min = max(0, x_min - random.randint(0, self.bbox_shift))
-        x_max = min(W, x_max + random.randint(0, self.bbox_shift))
-        y_min = max(0, y_min - random.randint(0, self.bbox_shift))
-        y_max = min(H, y_max + random.randint(0, self.bbox_shift))
-        bboxes = np.array([x_min, y_min, x_max, y_max])
-            #倒数第二个文件夹名作为case_name
-       
-        #打印sample的所有key
-        # print('sample:', sample.keys())
-        return (
-            torch.tensor(img_1024).float(),
-            torch.tensor(mask_1024[None, :, :]).float(),
-            torch.tensor(bboxes).float(),
-            torch.tensor(ref_img_1024).float(),
-            torch.tensor(ref_mask_1024[None, :, :]).float(),
-            img_name,
-        )
-
-# class Dataset_v9(Dataset):   #choose the neighbor slice as reference, the input includes original and reference image, box prompt are extracted by the ref_mask
-#     def __init__(self, base_dir, mode):
-        
-#         # self.split = split
-#         # self.sample_list = open(os.path.join(list_dir, self.split+'.txt')).readlines()
-#         self.data_dir = base_dir
-        
-#         self.dataset = base_dir.split('/')[-1]
-#         self.mode = mode
-#         self.bbox_shift = 20
-#         self.image_paths, self.mask_paths = self._get_image_mask_paths()
-    
-#     def _get_image_mask_paths(self):
-#         image_paths = []
-#         mask_paths = []
-#         ct_dir = os.path.join(self.data_dir, self.mode, "CT")
-#         # mask_dir = os.path.join(self.root_dir, "Mask")
-        
-#         for patient_folder in os.listdir(ct_dir):
-#             patient_ct_folder = os.path.join(ct_dir, patient_folder)
-#             # patient_mask_folder = os.path.join(mask_dir, patient_folder)
-#             for ct_filename in os.listdir(patient_ct_folder):
-#                 ct_path = os.path.join(patient_ct_folder, ct_filename)
-#                 mask_path = ct_path.replace('CT', 'Mask')
-                
-#                 if os.path.exists(mask_path):
-#                     image_paths.append(ct_path)
-#                     mask_paths.append(mask_path)
-        
-#         return image_paths, mask_paths
-
-#     def __len__(self):
-#         return len(self.image_paths) 
-
-#     def __getitem__(self, idx):
-#         image_path = self.image_paths[idx]
-#         mask_path = self.mask_paths[idx]
-#         img_name = os.path.basename(image_path)
-
-#         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
-#         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-#         mask = mask / 255.0
-
-#         x, y = image.shape
-#         if len(image.shape) == 2:
-#             img_3c = np.repeat(image[:, :, None], 3, axis=-1)
-#         elif len(image.shape) == 3 and image.shape[2]==4:
-#             img_3c = image[:, :, :3]
-#         else:
-#             img_3c = image
-
-#         img_1024 = transform.resize(
-#             img_3c, (1024, 1024), order=3, preserve_range=True, anti_aliasing=True
-#         ).astype(np.uint8)
-#         img_1024 = (img_1024 - img_1024.min()) / np.clip(
-#             img_1024.max() - img_1024.min(), a_min=1e-8, a_max=None
-#         )
-#         img_1024 = np.transpose(img_1024, (2, 0, 1))
-#         mask_1024 = transform.resize(
-#             mask, (1024, 1024), order=0, preserve_range=True, mode="constant", anti_aliasing=False
-#         )
-
-#         # 获取当前 slice 所在 volume
-#         patient_ct_folder = os.path.dirname(image_path)
-#         all_slices = sorted(os.listdir(patient_ct_folder))
-#         current_index = all_slices.index(os.path.basename(image_path))
-#         num_slices = len(all_slices)
-
-#         # 相邻 slice 策略：靠前选后一张，靠后选前一张
-#         if current_index < num_slices // 2:
-#             ref_index = min(current_index + 1, num_slices - 1)
-#         else:
-#             ref_index = max(current_index - 1, 0)
-
-#         ref_filename = all_slices[ref_index]
-#         ref_image_path = os.path.join(patient_ct_folder, ref_filename)
-#         ref_mask_path = ref_image_path.replace("CT", "Mask")
-
-#         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
-#         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-#         ref_mask = ref_mask / 255.0
-
-#         ref_mask_1024 = transform.resize(
-#             ref_mask, (1024, 1024), order=0, preserve_range=True, mode="constant", anti_aliasing=False
-#         )
-
-#         y_indices, x_indices = np.where(ref_mask_1024 > 0)
-#         x_min, x_max = np.min(x_indices), np.max(x_indices)
-#         y_min, y_max = np.min(y_indices), np.max(y_indices)
-
-#         ref_x, ref_y = ref_image.shape
-#         if len(ref_image.shape) == 2:
-#             ref_img_3c = np.repeat(ref_image[:, :, None], 3, axis=-1)
-#         elif len(ref_image.shape) == 3 and ref_image.shape[2]==4:
-#             ref_img_3c = ref_image[:, :, :3]
-#         else:
-#             ref_img_3c = ref_image
-
-#         ref_img_1024 = transform.resize(
-#             ref_img_3c, (1024, 1024), order=3, preserve_range=True, anti_aliasing=True
-#         ).astype(np.uint8)
-#         ref_img_1024 = (ref_img_1024 - ref_img_1024.min()) / np.clip(
-#             ref_img_1024.max() - ref_img_1024.min(), a_min=1e-8, a_max=None
-#         )
-#         ref_img_1024 = np.transpose(ref_img_1024, (2, 0, 1))
-
-#         # 添加 bbox 偏移
-#         H, W = ref_mask_1024.shape
-#         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
-#         x_max = min(W, x_max + random.randint(0, self.bbox_shift))
-#         y_min = max(0, y_min - random.randint(0, self.bbox_shift))
-#         y_max = min(H, y_max + random.randint(0, self.bbox_shift))
-#         bboxes = np.array([x_min, y_min, x_max, y_max])
-#         # print('img_path:', image_path)
-#         # print('ref_img_path:', ref_image_path)
-#         return (
-#             torch.tensor(img_1024).float(),
-#             torch.tensor(mask_1024[None, :, :]).float(),
-#             torch.tensor(bboxes).float(),
-#             torch.tensor(ref_img_1024).float(),
-#             torch.tensor(ref_mask_1024[None, :, :]).float(),
-#             img_name,
-#         )
-
-
 class Dataset_v9(Dataset):   # use NEIGHBOR slice GT to extract box prompt, neighbor slice as reference
     def __init__(self, base_dir, mode):
         self.data_dir = base_dir
@@ -1490,9 +1080,6 @@ class Dataset_v9(Dataset):   # use NEIGHBOR slice GT to extract box prompt, neig
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-
-
-
 class refinement(nn.Module):
     def __init__(self):
         super(refinement, self).__init__()
@@ -1553,7 +1140,6 @@ class refinement(nn.Module):
         refined_mask = original_mask + delta_mask                     # (bs,1,H,W)
 
         return refined_mask
-
 class MedSAM(nn.Module):
     def __init__(
         self,
@@ -1601,12 +1187,6 @@ class MedSAM(nn.Module):
         )
         final_mask = self.refinement(ori_res_masks, ref_mask, f0, f1, f2)
         return final_mask, ori_res_masks
-
-
-
-
-
-
 class refinement_v3(nn.Module):
     def __init__(self):
         super(refinement_v3, self).__init__()
@@ -1674,9 +1254,6 @@ class refinement_v3(nn.Module):
 
         out = self.final(d1)              # (bs, 1, 224, 224)
         return out
-
-
-
 class MedSAM_v3o1(nn.Module):
     def __init__(
         self,
@@ -1730,8 +1307,6 @@ class MedSAM_v3o1(nn.Module):
         # print('final_mask:', final_mask.shape, final_mask.max(), final_mask.min())
         # raise Exception
         return final_mask, ori_res_masks
-
-
 class ModulationNet(nn.Module):
     def __init__(self):
         super(ModulationNet, self).__init__()
@@ -1762,7 +1337,6 @@ class ModulationNet(nn.Module):
         # print('modulation_map:', modulation_map.shape, modulation_map.max(), modulation_map.min())
 
         return modulation_map, foreground_mask
-
 class refinement_v4(nn.Module):
     def __init__(self):
         super(refinement_v4, self).__init__()
@@ -1830,8 +1404,6 @@ class refinement_v4(nn.Module):
 
         out = self.final(d1)              # (bs, 1, 224, 224)
         return out
-
-
 class MedSAM_v3o2(nn.Module):
     def __init__(
         self,
@@ -1897,249 +1469,7 @@ class MedSAM_v3o2(nn.Module):
         # print('final_mask:', final_mask.shape, final_mask.max(), final_mask.min())
         # raise Exception
         return final_mask, ori_res_masks, modulation_map, ref_mask
-    
-
-
-#from now is the code needed by small transunet
 from os.path import join as pjoin
-
-ATTENTION_Q = "MultiHeadDotProductAttention_1/query"
-ATTENTION_K = "MultiHeadDotProductAttention_1/key"
-ATTENTION_V = "MultiHeadDotProductAttention_1/value"
-ATTENTION_OUT = "MultiHeadDotProductAttention_1/out"
-FC_0 = "MlpBlock_3/Dense_0"
-FC_1 = "MlpBlock_3/Dense_1"
-ATTENTION_NORM = "LayerNorm_0"
-MLP_NORM = "LayerNorm_2"
-
-def np2th(weights, conv=False):
-    """Possibly convert HWIO to OIHW."""
-    if conv:
-        weights = weights.transpose([3, 2, 0, 1])
-    return torch.from_numpy(weights)
-
-
-def swish(x):
-    return x * torch.sigmoid(x)
-
-
-ACT2FN = {"gelu": torch.nn.functional.gelu, "relu": torch.nn.functional.relu, "swish": swish}
-
-class Attention(nn.Module):
-    def __init__(self, config, vis):
-        super(Attention, self).__init__()
-        self.vis = vis
-        self.num_attention_heads = config.transformer["num_heads"]
-        self.attention_head_size = int(config.hidden_size / self.num_attention_heads)
-        self.all_head_size = self.num_attention_heads * self.attention_head_size
-
-        self.query = Linear(config.hidden_size, self.all_head_size)
-        self.key = Linear(config.hidden_size, self.all_head_size)
-        self.value = Linear(config.hidden_size, self.all_head_size)
-
-        self.out = Linear(config.hidden_size, config.hidden_size)
-        self.attn_dropout = Dropout(config.transformer["attention_dropout_rate"])
-        self.proj_dropout = Dropout(config.transformer["attention_dropout_rate"])
-
-        self.softmax = Softmax(dim=-1)
-
-    def transpose_for_scores(self, x):
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
-        x = x.view(*new_x_shape)
-        return x.permute(0, 2, 1, 3)
-
-    def forward(self, hidden_states):
-        mixed_query_layer = self.query(hidden_states)
-        mixed_key_layer = self.key(hidden_states)
-        mixed_value_layer = self.value(hidden_states)
-
-        query_layer = self.transpose_for_scores(mixed_query_layer)
-        key_layer = self.transpose_for_scores(mixed_key_layer)
-        value_layer = self.transpose_for_scores(mixed_value_layer)
-
-        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
-        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
-        attention_probs = self.softmax(attention_scores)
-        weights = attention_probs if self.vis else None
-        attention_probs = self.attn_dropout(attention_probs)
-
-        context_layer = torch.matmul(attention_probs, value_layer)
-        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
-        context_layer = context_layer.view(*new_context_layer_shape)
-        attention_output = self.out(context_layer)
-        attention_output = self.proj_dropout(attention_output)
-        return attention_output, weights
-
-
-class Mlp(nn.Module):
-    def __init__(self, config):
-        super(Mlp, self).__init__()
-        self.fc1 = Linear(config.hidden_size, config.transformer["mlp_dim"])
-        self.fc2 = Linear(config.transformer["mlp_dim"], config.hidden_size)
-        self.act_fn = ACT2FN["gelu"]
-        self.dropout = Dropout(config.transformer["dropout_rate"])
-
-        self._init_weights()
-
-    def _init_weights(self):
-        nn.init.xavier_uniform_(self.fc1.weight)
-        nn.init.xavier_uniform_(self.fc2.weight)
-        nn.init.normal_(self.fc1.bias, std=1e-6)
-        nn.init.normal_(self.fc2.bias, std=1e-6)
-
-    def forward(self, x):
-        x = self.fc1(x)
-        x = self.act_fn(x)
-        x = self.dropout(x)
-        x = self.fc2(x)
-        x = self.dropout(x)
-        return x
-
-
-
-
-
-class Embeddings2(nn.Module):
-    """Construct the embeddings from patch, position embeddings.
-    """
-    def __init__(self, config, img_size, in_channels=5):  #csp,change 3 to 5
-        super(Embeddings2, self).__init__()
-        self.hybrid = None
-        self.config = config
-        img_size = _pair(img_size)
-
-        if config.patches.get("grid") is not None:   # ResNet
-            grid_size = config.patches["grid"]
-            # print('grid_size:',grid_size)
-            # print('img_size:',img_size)
-            patch_size = (img_size[0] // 16 // grid_size[0], img_size[1] // 16 // grid_size[1])
-            patch_size_real = (patch_size[0] * 16, patch_size[1] * 16)
-            n_patches = (img_size[0] // patch_size_real[0]) * (img_size[1] // patch_size_real[1])  
-            self.hybrid = True
-        else:
-            patch_size = _pair(config.patches["size"])
-            n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
-            self.hybrid = False
-
-        if self.hybrid:
-            self.hybrid_model = ResNetV3(block_units=config.resnet.num_layers, width_factor=config.resnet.width_factor)
-            in_channels = self.hybrid_model.width * 16
-        self.patch_embeddings = Conv2d(in_channels=in_channels,
-                                       out_channels=config.hidden_size,
-                                       kernel_size=patch_size,
-                                       stride=patch_size)
-        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, config.hidden_size))
-
-        self.dropout = Dropout(config.transformer["dropout_rate"])
-
-
-    def forward(self, x):
-        if self.hybrid:
-            x, features = self.hybrid_model(x)
-        else:
-            features = None
-        x = self.patch_embeddings(x)  # (B, hidden. n_patches^(1/2), n_patches^(1/2))
-        x = x.flatten(2)
-        x = x.transpose(-1, -2)  # (B, n_patches, hidden)
-
-        embeddings = x + self.position_embeddings
-        embeddings = self.dropout(embeddings)
-        return embeddings, features
-
-
-
-class Block(nn.Module):
-    def __init__(self, config, vis):
-        super(Block, self).__init__()
-        self.hidden_size = config.hidden_size
-        self.attention_norm = LayerNorm(config.hidden_size, eps=1e-6)
-        self.ffn_norm = LayerNorm(config.hidden_size, eps=1e-6)
-        self.ffn = Mlp(config)
-        self.attn = Attention(config, vis)
-
-    def forward(self, x):
-        h = x
-        x = self.attention_norm(x)
-        x, weights = self.attn(x)
-        x = x + h
-
-        h = x
-        x = self.ffn_norm(x)
-        x = self.ffn(x)
-        x = x + h
-        return x, weights
-
-    def load_from(self, weights, n_block):
-        ROOT = f"Transformer/encoderblock_{n_block}"
-        with torch.no_grad():
-            query_weight = np2th(weights[pjoin(ROOT, ATTENTION_Q, "kernel")]).view(self.hidden_size, self.hidden_size).t()
-            key_weight = np2th(weights[pjoin(ROOT, ATTENTION_K, "kernel")]).view(self.hidden_size, self.hidden_size).t()
-            value_weight = np2th(weights[pjoin(ROOT, ATTENTION_V, "kernel")]).view(self.hidden_size, self.hidden_size).t()
-            out_weight = np2th(weights[pjoin(ROOT, ATTENTION_OUT, "kernel")]).view(self.hidden_size, self.hidden_size).t()
-
-            query_bias = np2th(weights[pjoin(ROOT, ATTENTION_Q, "bias")]).view(-1)
-            key_bias = np2th(weights[pjoin(ROOT, ATTENTION_K, "bias")]).view(-1)
-            value_bias = np2th(weights[pjoin(ROOT, ATTENTION_V, "bias")]).view(-1)
-            out_bias = np2th(weights[pjoin(ROOT, ATTENTION_OUT, "bias")]).view(-1)
-
-            self.attn.query.weight.copy_(query_weight)
-            self.attn.key.weight.copy_(key_weight)
-            self.attn.value.weight.copy_(value_weight)
-            self.attn.out.weight.copy_(out_weight)
-            self.attn.query.bias.copy_(query_bias)
-            self.attn.key.bias.copy_(key_bias)
-            self.attn.value.bias.copy_(value_bias)
-            self.attn.out.bias.copy_(out_bias)
-
-            mlp_weight_0 = np2th(weights[pjoin(ROOT, FC_0, "kernel")]).t()
-            mlp_weight_1 = np2th(weights[pjoin(ROOT, FC_1, "kernel")]).t()
-            mlp_bias_0 = np2th(weights[pjoin(ROOT, FC_0, "bias")]).t()
-            mlp_bias_1 = np2th(weights[pjoin(ROOT, FC_1, "bias")]).t()
-
-            self.ffn.fc1.weight.copy_(mlp_weight_0)
-            self.ffn.fc2.weight.copy_(mlp_weight_1)
-            self.ffn.fc1.bias.copy_(mlp_bias_0)
-            self.ffn.fc2.bias.copy_(mlp_bias_1)
-
-            self.attention_norm.weight.copy_(np2th(weights[pjoin(ROOT, ATTENTION_NORM, "scale")]))
-            self.attention_norm.bias.copy_(np2th(weights[pjoin(ROOT, ATTENTION_NORM, "bias")]))
-            self.ffn_norm.weight.copy_(np2th(weights[pjoin(ROOT, MLP_NORM, "scale")]))
-            self.ffn_norm.bias.copy_(np2th(weights[pjoin(ROOT, MLP_NORM, "bias")]))
-
-
-class Encoder(nn.Module):
-    def __init__(self, config, vis):
-        super(Encoder, self).__init__()
-        self.vis = vis
-        self.layer = nn.ModuleList()
-        self.encoder_norm = LayerNorm(config.hidden_size, eps=1e-6)
-        for _ in range(config.transformer["num_layers"]):
-            layer = Block(config, vis)
-            self.layer.append(copy.deepcopy(layer))
-
-    def forward(self, hidden_states):
-        attn_weights = []
-        for layer_block in self.layer:
-            hidden_states, weights = layer_block(hidden_states)
-            if self.vis:
-                attn_weights.append(weights)
-        encoded = self.encoder_norm(hidden_states)
-        return encoded, attn_weights
-
-
-class Transformer2(nn.Module):  #used in the smaller segmentation
-    def __init__(self, config, img_size, vis):
-        super(Transformer2, self).__init__()
-        self.embeddings = Embeddings2(config, img_size=img_size)
-        self.encoder = Encoder(config, vis)
-
-    def forward(self, input_ids):
-        embedding_output, features = self.embeddings(input_ids)
-        encoded, attn_weights = self.encoder(embedding_output)  # (B, n_patch, hidden)
-        return encoded, attn_weights, features
-
-
 class Conv2dReLU(nn.Sequential):
     def __init__(
             self,
@@ -2163,219 +1493,6 @@ class Conv2dReLU(nn.Sequential):
         bn = nn.BatchNorm2d(out_channels)
 
         super(Conv2dReLU, self).__init__(conv, bn, relu)
-
-
-class DecoderBlock(nn.Module):
-    def __init__(
-            self,
-            in_channels,
-            out_channels,
-            skip_channels=0,
-            use_batchnorm=True,
-    ):
-        super().__init__()
-        self.conv1 = Conv2dReLU(
-            in_channels + skip_channels,
-            out_channels,
-            kernel_size=3,
-            padding=1,
-            use_batchnorm=use_batchnorm,
-        )
-        self.conv2 = Conv2dReLU(
-            out_channels,
-            out_channels,
-            kernel_size=3,
-            padding=1,
-            use_batchnorm=use_batchnorm,
-        )
-        self.up = nn.UpsamplingBilinear2d(scale_factor=2)
-
-    def forward(self, x, skip=None):
-        x = self.up(x)
-        if skip is not None:
-            x = torch.cat([x, skip], dim=1)
-        x = self.conv1(x)
-        x = self.conv2(x)
-        return x
-
-
-class SegmentationHead(nn.Sequential):
-
-    def __init__(self, in_channels, out_channels, kernel_size=3, upsampling=1):
-        conv2d = nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, padding=kernel_size // 2)
-        upsampling = nn.UpsamplingBilinear2d(scale_factor=upsampling) if upsampling > 1 else nn.Identity()
-        super().__init__(conv2d, upsampling)
-
-
-class DecoderCup(nn.Module):
-    def __init__(self, config):
-        super().__init__()
-        self.config = config
-        head_channels = 512
-        self.conv_more = Conv2dReLU(
-            config.hidden_size,
-            head_channels,
-            kernel_size=3,
-            padding=1,
-            use_batchnorm=True,
-        )
-        decoder_channels = config.decoder_channels
-        in_channels = [head_channels] + list(decoder_channels[:-1])
-        
-        out_channels = decoder_channels
-        
-
-        if self.config.n_skip != 0:
-            skip_channels = self.config.skip_channels
-            for i in range(4-self.config.n_skip):  # re-select the skip channels according to n_skip
-                skip_channels[3-i]=0
-
-        else:
-            skip_channels=[0,0,0,0]
-        # print('in_channels:',in_channels)
-        # print('out_channels:',out_channels)
-        # print('skip_channels:',skip_channels)
-        blocks = [
-            DecoderBlock(in_ch, out_ch, sk_ch) for in_ch, out_ch, sk_ch in zip(in_channels, out_channels, skip_channels)
-        ]
-        self.blocks = nn.ModuleList(blocks)
-
-    def forward(self, hidden_states, features=None):
-        # print('hidden_states:',hidden_states.shape)    #24,196,768
-        B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
-        h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
-        x = hidden_states.permute(0, 2, 1)
-        # print('x1:',x.shape)
-        x = x.contiguous().view(B, hidden, h, w)  #24,768,14,14
-        # print('x2:',x.shape)
-        x = self.conv_more(x)  #24,512,14,14
-        # print('x3:',x.shape)
-        #features[0]:24,512,28,28; features[1]:24,256,56,56; features[2]:24,64,112,112
-        for i, decoder_block in enumerate(self.blocks):
-            if features is not None:
-                skip = features[i] if (i < self.config.n_skip) else None
-            else:
-                skip = None
-            x = decoder_block(x, skip=skip)
-            #x.shape:24,256,28,28; 24,64,56,56; 24,16,112,112; 24,16,224,224
-        #     print('d_x'+str(i),x.shape)
-        # print('final_x:',x.shape)
-        return x
-
-
-
-
-    
-    
-
-
-
-class refinement_v7(nn.Module):   #smaller transunet as refinement
-    def __init__(self, config, img_size=1024, num_classes=2, zero_head=False, vis=False):
-        super(refinement_v7, self).__init__()
-        self.num_classes = num_classes
-        self.zero_head = zero_head
-        self.classifier = config.classifier
-        self.transformer = Transformer2(config, img_size, vis)
-        self.decoder = DecoderCup(config)
-        self.segmentation_head = SegmentationHead(
-            in_channels=config['decoder_channels'][-1],
-            out_channels=1, #csp change it to 1
-            kernel_size=3,
-        )
-        self.config = config
-
-    def forward(self, x):
-        if x.size()[1] == 1:
-            x = x.repeat(1,5,1,1)
-        x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
-        # print('x:',x.shape)
-        x = self.decoder(x, features)
-        logits = self.segmentation_head(x)
-        return logits
-
-class MedSAM_v6(nn.Module):
-    def __init__(
-        self,
-        image_encoder,
-        mask_decoder,
-        prompt_encoder,
-        refinement
-    ):
-        super().__init__()
-        self.image_encoder = image_encoder
-        self.mask_decoder = mask_decoder
-        self.prompt_encoder = prompt_encoder
-        self.refinement = refinement
-        # freeze prompt encoder
-        for param in self.prompt_encoder.parameters():
-            param.requires_grad = False
-
-    def forward(self, image, box, ref_image, ref_gt):
-        image_embedding, features = self.image_encoder(image)  # (B, 256, 64, 64)
-        ref_image_embedding, ref_features = self.image_encoder(ref_image)  # (B, 256, 64, 64)
-        # f0, f1, f2 = features  # bs,64,64,768
-        # print('f0:', f0.shape, 'f1:', f1.shape, 'f2:', f2.shape)
-        # do not compute gradients for prompt encoder
-        with torch.no_grad():
-            box_torch = torch.as_tensor(box, dtype=torch.float32, device=image.device)
-            if len(box_torch.shape) == 2:
-                box_torch = box_torch[:, None, :]  # (B, 1, 4)
-
-            sparse_embeddings, dense_embeddings = self.prompt_encoder(
-                points=None,
-                boxes=box_torch,
-                masks=None,
-            )
-        low_res_masks, _ = self.mask_decoder(
-            image_embeddings=image_embedding,  # (B, 256, 64, 64)
-            image_pe=self.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
-            sparse_prompt_embeddings=sparse_embeddings,  # (B, 2, 256)
-            dense_prompt_embeddings=dense_embeddings,  # (B, 256, 64, 64)
-            multimask_output=False,
-        )
-        ori_res_masks = F.interpolate(
-            low_res_masks,
-            size=(image.shape[2], image.shape[3]),
-            mode="bilinear",
-            align_corners=False,
-        )
-        # print('ori_res_masks:', ori_res_masks.shape, ori_res_masks.max(), ori_res_masks.min())
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('image:', image.shape, image.max(), image.min())
-        ori_mask = torch.sigmoid(ori_res_masks)  # (bs, 1, 1024, 1024)
-        
-
-        low_res_ref_masks, _ = self.mask_decoder(
-            image_embeddings=ref_image_embedding,  # (B, 256, 64, 64)
-            image_pe=self.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
-            sparse_prompt_embeddings=sparse_embeddings,  # (B, 2, 256)
-            dense_prompt_embeddings=dense_embeddings,  # (B, 256, 64, 64)
-            multimask_output=False,
-        )
-        ori_res_ref_masks = F.interpolate(
-            low_res_ref_masks,
-            size=(ref_image.shape[2], ref_image.shape[3]),
-            mode="bilinear",
-            align_corners=False,
-        )
-        # print('ori_res_masks:', ori_res_masks.shape, ori_res_masks.max(), ori_res_masks.min())
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('image:', image.shape, image.max(), image.min())
-        ori_mask = torch.sigmoid(ori_res_masks)  # (bs, 1, 1024, 1024)
-        ref_mask = torch.sigmoid(ori_res_ref_masks)
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('ori_mask:', ori_mask.shape, ori_mask.max(), ori_mask.min())
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
-        # print('image:', image.shape, image.max(), image.min())
-        # print('ref_gt:', ref_gt.shape, ref_gt.max(), ref_gt.min())
-        new_image = torch.cat([image[:,0:1,:,:], ori_mask, ref_image[:,0:1,:,:], ref_mask, ref_gt], dim=1)
-        # print('new_image:', new_image.shape, new_image.max(), new_image.min())
-        final_mask = self.refinement(new_image)
-        # print('final_mask:', final_mask.shape, final_mask.max(), final_mask.min())
-        # raise Exception
-        return final_mask, ori_mask, ref_mask
-
 class LinearAlign(nn.Module):
     """1x1 Conv + BN（无激活），轻量通道对齐"""
     def __init__(self, ch):
@@ -2384,8 +1501,6 @@ class LinearAlign(nn.Module):
         self.bn   = nn.BatchNorm2d(ch)
     def forward(self, x):
         return self.bn(self.conv(x))
-
-@torch.no_grad()
 def compute_conf_and_pyramid(ref_mask, ref_gt, w_g=0.7, detach=True):
     """
     ref_mask: (B,1,224,224)  概率（前景通道）
@@ -2407,8 +1522,6 @@ def compute_conf_and_pyramid(ref_mask, ref_gt, w_g=0.7, detach=True):
     conf_56  = F.interpolate(conf, size=(256,256),   mode='bilinear', align_corners=True)
     conf_28  = F.interpolate(conf, size=(128,128),   mode='bilinear', align_corners=True)
     return conf_112, conf_56, conf_28
-
-
 class Decoder_AlignPlusConf(nn.Module):
     def __init__(self):
         super().__init__()
@@ -2465,10 +1578,7 @@ class Decoder_AlignPlusConf(nn.Module):
 
         x = self.final_up(x)                             # (B,64,224,224)
         return self.out_conv(x)
-
-
 from timm import create_model
-
 class InputAdapter(nn.Module):
     """把 n 通道的 [pred, image(, gt)] 映射到 3 通道，以便完整复用 ImageNet 预训练。
        结构：Conv3x3 → BN → GELU → Conv1x1 （轻量、稳定）
@@ -2483,8 +1593,6 @@ class InputAdapter(nn.Module):
 
     def forward(self, x):
         return self.net(x)
-
-
 class ResNetEncoderAligned(nn.Module):
     """
     用 timm 的 ResNet（此处改成 resnet18）做 backbone，
@@ -2533,22 +1641,18 @@ class ResNetEncoderAligned(nn.Module):
         # 你的 decoder 期望顺序：[512@28, 256@56, 64@112]
         features = [f28, f56, f112]
         return x14, features
-
-
 class target_encoder_resnet(nn.Module):
     def __init__(self, config, img_size=1024, in_chans=2, variant='resnet18', pretrained=True):
         super().__init__()
         self.enc = ResNetEncoderAligned(variant=variant, in_chans=in_chans,
                                         pretrained=pretrained, keep_rgb_weights=True)
     def forward(self, x): return self.enc(x)
-
 class reference_encoder_resnet(nn.Module):
     def __init__(self, config, img_size=1024, in_chans=3, variant='resnet18', pretrained=True):
         super().__init__()
         self.enc = ResNetEncoderAligned(variant=variant, in_chans=in_chans,
                                         pretrained=pretrained, keep_rgb_weights=False)
     def forward(self, x): return self.enc(x)
-
 class TRACE(nn.Module):   #
     def __init__(self, config, img_size=1024, num_classes=2, zero_head=False, vis=False, pretrained=True):
         super(TRACE, self).__init__()
@@ -2599,8 +1703,6 @@ class TRACE(nn.Module):   #
         # logits = self.decoder(features[2], features[1], features[0], x)
         # logits = self.segmentation_head(x)
         return logits
-
-
 class MedSAM_with_TRACE(nn.Module):
     def __init__(
         self,
@@ -2707,9 +1809,3 @@ class MedSAM_with_TRACE(nn.Module):
         # raise Exception
         # return logits
         return {"final": final_pred, "iters": preds_all}
-
-        # print('new_image:', new_image.shape, new_image.max(), new_image.min())
-        # final_mask = self.refinement(new_image)
-        # # print('final_mask:', final_mask.shape, final_mask.max(), final_mask.min())
-        # # raise Exception
-        # return final_mask, ori_mask, ref_mask

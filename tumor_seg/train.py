@@ -6,8 +6,7 @@ import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from .networks.vit_seg_modeling import My_VisionTransformer as My_ViT_seg
-from .networks.vit_seg_modeling import TransUNet_ours as TransUNet_ours
+from .networks.vit_seg_modeling import TransUNet_ours
 from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from .networks.medformer import MedFormer,MedFormer_ours
 from .networks.attention_unet import AttentionUNet,AttentionUNet_ours
