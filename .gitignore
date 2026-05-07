@@ -1,0 +1,120 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*-checkpoint.ipynb
+
+# Logs & experiment trackers
+*.log
+logs/
+log/
+wandb/
+mlruns/
+lightning_logs/
+tensorboard/
+outputs/
+output/
+runs/
+exps/
+
+# Checkpoints / weights (download separately, do not commit)
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+*.onnx
+ckpt/
+ckpts/
+checkpoints/
+weights/
+pretrained/
+snapshots/
+model/
+models/
+
+# Data formats (do not commit data)
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.nrrd
+*.dcm
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.mat
+*.zip
+
+# Project-specific data folders
+2D_data/
+data/
+raw/
+processed/
+cache/
+
+# Simulation / experiment outputs
+Simulation/
+simulation_output/
+
+# Visualization outputs
+fig_*/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+*.gif
+
+# Allow figures inside docs/
+!docs/**/*.pdf
+!docs/**/*.png
+!docs/**/*.jpg
+
+# Secrets
+*.pem
+*.key
+*.p12
+*.pfx
+.env
+.env.*
+secrets/
+**/*secret*
+**/*apikey*
+**/*api_key*
+**/*token*
+
+# C extensions / compiled
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+*.out

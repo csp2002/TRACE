@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tumor-seg-trace"
+version = "0.1.0"
+description = "TRACE: a reference-conditioned iterative refinement module for tumor segmentation, evaluated on 9 backbones across 5 datasets."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "The TRACE Authors" }
+]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+[project.urls]
+Repository = "https://github.com/<org>/tumor-seg-trace"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tumor_seg*", "data_preparation*"]
+exclude = ["third_party*", "scripts*", "docs*"]
