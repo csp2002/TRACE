@@ -990,7 +990,7 @@ class DoctorSimTester:
                 ref_img_tensor = ref_img_tensor.to(self.dev)
                 ref_gt_tensor = ref_gt_tensor.to(self.dev)
                 
-                # Forward pass (boxes as numpy array (1, 4), like test_medsam2_2d_with_trace.py)
+                # Forward pass (boxes as numpy array (1, 4), like the TRACE eval path)
                 with torch.no_grad():
                     output = model(img_tensor, box_np, ref_img_tensor, ref_gt_tensor, image_size=512)
                     if isinstance(output, dict):

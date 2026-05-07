@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 2D训练脚本
-使用middle或neighbor slice的GT Mask提取box prompt进行训练
-直接使用MedSAM2模型进行训练，使用MedSAM2的loss函数和transforms
+MedSAM2 2D training script.
+
+Single entry point that supports both baseline MedSAM2 finetuning and
+MedSAM2 + TRACE finetuning via the --use_trace flag. Reference protocol
+(middle / neighbor slice) is selected via --ref_type.
 """
 
 import os
@@ -25,6 +27,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sam2.build_sam import build_sam2
 from training.dataset.medsam2_2d_dataset import MedSAM2_2D_Dataset
 from training.loss_fns import dice_loss, sigmoid_focal_loss
+from training.model.medsam2_with_trace import MedSAM2_with_TRACE
+from training.model.trace import TRACE
 
 # 设置随机种子
 torch.manual_seed(2023)
@@ -213,7 +217,29 @@ def compute_loss(pred_masks, pred_ious, gt_masks, num_objects, weight_dict=None)
     return total_loss, loss_mask.sum(), loss_dice_val.sum()
 
 
-def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, image_size=512):
+def compute_loss_with_trace(preds_all, gt_masks, num_objects, weight_dict=None):
+    """
+    Deep-supervision loss for MedSAM2 + TRACE: focal + dice on every
+    refinement iteration's output.
+    """
+    if weight_dict is None:
+        weight_dict = {"loss_mask": 20.0, "loss_dice": 1.0}
+    total_focal = 0.0
+    total_dice = 0.0
+    total_loss = 0.0
+    n_iters = len(preds_all)
+    for preds in preds_all:
+        if preds.shape[-2:] != gt_masks.shape[-2:]:
+            preds = F.interpolate(preds, size=gt_masks.shape[-2:], mode="bilinear", align_corners=False)
+        focal = sigmoid_focal_loss(preds, gt_masks, num_objects, alpha=0.25, gamma=2.0)
+        dice = dice_loss(preds, gt_masks, num_objects)
+        total_focal = total_focal + focal
+        total_dice = total_dice + dice
+        total_loss = total_loss + weight_dict["loss_mask"] * focal + weight_dict["loss_dice"] * dice
+    return total_loss / n_iters, total_focal / n_iters, total_dice / n_iters
+
+
+def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, image_size=512, use_trace=False):
     """训练一个epoch"""
     model.train()
     total_loss = 0.0
@@ -225,53 +251,37 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
     
     pbar = tqdm(dataloader, desc=f"Epoch {epoch}")
     for batch_idx, batch in enumerate(pbar):
-        # 获取数据
-        images = batch['image'].to(device)  # (B, 3, H, W), float, normalized
-        masks = batch['mask'].to(device)  # (B, 1, H, W), float [0, 1]
-        bboxes = batch['bbox'].cpu().numpy()  # (B, 4), numpy [x_min, y_min, x_max, y_max]
-        
+        images = batch['image'].to(device)
+        masks = batch['mask'].to(device)
+        bboxes = batch['bbox'].cpu().numpy()
+        if use_trace:
+            if 'ref_image' not in batch or 'ref_gt' not in batch:
+                raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for the TRACE variant")
+            ref_images = batch['ref_image'].to(device)
+            ref_gts = batch['ref_gt'].to(device)
+
         batch_size = images.shape[0]
         optimizer.zero_grad()
-        
-        # bboxes已经在image_size尺度下
-        boxes_array = bboxes  # (B, 4)
-        
+
+        def _forward_and_loss():
+            num_objects = float(batch_size)
+            if use_trace:
+                outputs = model(images, bboxes, ref_images, ref_gts, image_size=image_size)
+                return compute_loss_with_trace(outputs['iters'], masks, num_objects)
+            else:
+                high_res_multimasks, ious, _, _ = forward_with_box(
+                    model, images, bboxes, image_size=image_size, multimask_output=True
+                )
+                return compute_loss(high_res_multimasks, ious, masks, num_objects)
+
         if use_amp and scaler is not None:
             with torch.autocast(device_type="cuda", dtype=torch.float16):
-                # 前向传播
-                
-
-                high_res_multimasks, ious, _, _ = forward_with_box(
-                    model, images, boxes_array, image_size=image_size, multimask_output=True
-                )
-                
-                # 计算loss
-                num_objects = float(batch_size)
-                total_loss_val, focal_loss, dice_loss_val = compute_loss(
-                    high_res_multimasks, ious, masks, num_objects
-                )
-                H, W = masks.shape[-2], masks.shape[-1]
-                # print("focal(raw)=", focal_loss.item(), "focal*HW=", focal_loss.item() * H * W)
-
-            
+                total_loss_val, focal_loss, dice_loss_val = _forward_and_loss()
             scaler.scale(total_loss_val).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            # print("images.shape:", images.shape,"max:", images.max(), "min:", images.min())
-            # print("masks.shape:", masks.shape,"max:", masks.max(), "min:", masks.min())
-            # print("boxes_array.shape:", boxes_array.shape,"max:", boxes_array.max(), "min:", boxes_array.min())
-            # 前向传播
-            high_res_multimasks, ious, _, _ = forward_with_box(
-                model, images, boxes_array, image_size=image_size, multimask_output=True
-            )
-            # print("high_res_multimasks.shape:", high_res_multimasks.shape,"max:", high_res_multimasks.max(), "min:", high_res_multimasks.min())
-            # 计算loss
-            num_objects = float(batch_size)
-            total_loss_val, focal_loss, dice_loss_val = compute_loss(
-                high_res_multimasks, ious, masks, num_objects
-            )
-            
+            total_loss_val, focal_loss, dice_loss_val = _forward_and_loss()
             total_loss_val.backward()
             optimizer.step()
         
@@ -389,11 +399,33 @@ def main():
         default="",
         help="Resume training from checkpoint"
     )
-    
+    parser.add_argument(
+        "--use_trace",
+        action="store_true",
+        help="Train MedSAM2 + TRACE; default is baseline MedSAM2 finetuning."
+    )
+    parser.add_argument(
+        "--refine_iters",
+        type=int,
+        default=3,
+        help="Number of refinement iterations for TRACE (default: 3, only used with --use_trace)."
+    )
+    parser.add_argument(
+        "--refinement_lr",
+        type=float,
+        default=5e-5,
+        help="Learning rate for the TRACE refinement module (only used with --use_trace)."
+    )
+    parser.add_argument(
+        "--freeze_sam2",
+        action="store_true",
+        help="Freeze the SAM2 backbone and only train the TRACE refinement (only used with --use_trace)."
+    )
+
     args = parser.parse_args()
     
     # 创建输出目录
-    task_name = f"MedSAM2-2D-{args.data}-{args.ref_type}"
+    task_name = f"MedSAM2-2D-{'with_TRACE' if args.use_trace else 'baseline'}-{args.data}-{args.ref_type}"
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     model_save_path = os.path.join(args.work_dir, task_name, run_id)
     os.makedirs(model_save_path, exist_ok=True)
@@ -420,10 +452,28 @@ def main():
         device=device,
         mode="train"
     )
-    
-    # 打印模型参数
-    total_params = sum(p.numel() for p in sam2_model.parameters())
-    trainable_params = sum(p.numel() for p in sam2_model.parameters() if p.requires_grad)
+
+    if args.use_trace:
+        class _RefinementConfig:
+            classifier = None
+        refinement_module = TRACE(_RefinementConfig(), img_size=args.image_size, pretrained=True)
+        model = MedSAM2_with_TRACE(
+            sam2_model=sam2_model,
+            refinement=refinement_module,
+            refine_iters=args.refine_iters,
+            detach_between_iters=True,
+        )
+        if args.freeze_sam2:
+            for p in model.sam2_model.parameters():
+                p.requires_grad = False
+            for p in model.refinement.parameters():
+                p.requires_grad = True
+            print("Frozen SAM2 backbone; only training the TRACE refinement.")
+    else:
+        model = sam2_model
+
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total parameters: {total_params / 1e6:.2f}M")
     print(f"Trainable parameters: {trainable_params / 1e6:.2f}M")
     
@@ -448,32 +498,39 @@ def main():
         drop_last=True
     )
     
-    # 优化器（分层学习率：image_encoder使用3e-5，其他组件使用5e-5）
-    # 分离image_encoder参数和其他参数
+    # Layered learning rates: image encoder, optional TRACE refinement, other.
     image_encoder_params = []
+    refinement_params = []
     other_params = []
-    
-    for name, param in sam2_model.named_parameters():
+    for name, param in model.named_parameters():
+        if not param.requires_grad:
+            continue
         if 'image_encoder' in name:
             image_encoder_params.append(param)
+        elif args.use_trace and 'refinement' in name:
+            refinement_params.append(param)
         else:
             other_params.append(param)
-    
-    # 创建参数组
-    param_groups = [
-        {'params': image_encoder_params, 'lr': args.vision_lr, 'weight_decay': args.weight_decay},
-        {'params': other_params, 'lr': args.lr, 'weight_decay': args.weight_decay},
-    ]
-    
+
+    param_groups = []
+    if image_encoder_params:
+        param_groups.append({'params': image_encoder_params, 'lr': args.vision_lr, 'weight_decay': args.weight_decay})
+    if refinement_params:
+        param_groups.append({'params': refinement_params, 'lr': args.refinement_lr, 'weight_decay': args.weight_decay})
+    if other_params:
+        param_groups.append({'params': other_params, 'lr': args.lr, 'weight_decay': args.weight_decay})
+
     optimizer = torch.optim.AdamW(
         param_groups,
-        betas=(0.9, 0.999),  # Paper: β1=0.9, β2=0.999
-        weight_decay=args.weight_decay
+        betas=(0.9, 0.999),
+        weight_decay=args.weight_decay,
     )
-    
+
     print(f"Image encoder parameters: {sum(p.numel() for p in image_encoder_params) / 1e6:.2f}M")
+    if refinement_params:
+        print(f"TRACE refinement parameters: {sum(p.numel() for p in refinement_params) / 1e6:.2f}M")
     print(f"Other parameters: {sum(p.numel() for p in other_params) / 1e6:.2f}M")
-    print(f"Image encoder LR: {args.vision_lr}, Other LR: {args.lr}")
+    print(f"Image encoder LR: {args.vision_lr}, Other LR: {args.lr}" + (f", TRACE LR: {args.refinement_lr}" if refinement_params else ""))
     
     # 恢复训练
     start_epoch = 0
@@ -481,7 +538,7 @@ def main():
         if os.path.isfile(args.resume):
             checkpoint = torch.load(args.resume, map_location=device)
             start_epoch = checkpoint.get("epoch", 0) + 1
-            sam2_model.load_state_dict(checkpoint.get("model", checkpoint))
+            model.load_state_dict(checkpoint.get("model", checkpoint))
             optimizer.load_state_dict(checkpoint.get("optimizer", {}))
             print(f"Resumed from epoch {start_epoch}")
     
@@ -497,13 +554,14 @@ def main():
         print(f"{'='*50}")
         
         avg_loss, avg_focal, avg_dice = train_one_epoch(
-            sam2_model, 
-            train_dataloader, 
-            optimizer, 
-            device, 
+            model,
+            train_dataloader,
+            optimizer,
+            device,
             epoch,
             use_amp=args.use_amp,
-            image_size=args.image_size
+            image_size=args.image_size,
+            use_trace=args.use_trace,
         )
         
         losses.append(avg_loss)
@@ -514,7 +572,7 @@ def main():
         
         # 保存checkpoint
         checkpoint = {
-            "model": sam2_model.state_dict(),
+            "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
             "loss": avg_loss,

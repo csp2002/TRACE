@@ -21,6 +21,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from training.dataset.medsam2_2d_dataset import MedSAM2_2D_Dataset
+from training.model.medsam2_with_trace import MedSAM2_with_TRACE
+from training.model.trace import TRACE
 from torch.utils.data import DataLoader
 
 
@@ -124,6 +126,36 @@ def medsam2_inference(image_predictor, img_rgb, box):
     # 获取第一个掩码（因为 multimask_output=False）
     medsam_seg = (masks[0] > 0.0).astype(np.uint8)
     return medsam_seg
+
+
+def eval_model_trace(model, dataloader, device, image_size=512):
+    """Evaluate the MedSAM2 + TRACE wrapper model via the standard
+    MedSAM2_2D_Dataset DataLoader. Returns (avg_iou, avg_dice)."""
+    model.eval()
+    total_iou = 0.0
+    total_dice = 0.0
+    num_samples = 0
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Evaluating"):
+            images = batch['image'].to(device)
+            masks = batch['mask'].to(device)
+            bboxes = batch['bbox'].cpu().numpy()
+            if 'ref_image' not in batch or 'ref_gt' not in batch:
+                raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for the TRACE variant")
+            ref_images = batch['ref_image'].to(device)
+            ref_gts = batch['ref_gt'].to(device)
+            outputs = model(images, bboxes, ref_images, ref_gts, image_size=image_size)
+            pred_masks = torch.sigmoid(outputs['final'])
+            pred_np = pred_masks.cpu().numpy()
+            target_np = masks.cpu().numpy()
+            for i in range(pred_np.shape[0]):
+                iou, dice = compute_metrics(pred_np[i, 0], target_np[i, 0])
+                total_iou += iou
+                total_dice += dice
+                num_samples += 1
+    avg_iou = total_iou / num_samples if num_samples > 0 else 0.0
+    avg_dice = total_dice / num_samples if num_samples > 0 else 0.0
+    return avg_iou, avg_dice
 
 
 def eval_model(model, image_paths, mask_paths, annotation_path, device, image_size=512):
@@ -295,9 +327,32 @@ def main():
         "--batch_size",
         type=int,
         default=1,
-        help="Batch size (not used in inference, kept for compatibility)"
+        help="Batch size (used by the TRACE eval DataLoader)"
     )
-    
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=2,
+        help="Data-loading workers (used by the TRACE eval DataLoader)"
+    )
+    parser.add_argument(
+        "--use_trace",
+        action="store_true",
+        help="Evaluate MedSAM2 + TRACE; default is baseline MedSAM2."
+    )
+    parser.add_argument(
+        "--model_ckpt",
+        type=str,
+        default="",
+        help="Path to the trained MedSAM2 + TRACE checkpoint (only used with --use_trace)."
+    )
+    parser.add_argument(
+        "--refine_iters",
+        type=int,
+        default=3,
+        help="Refinement iterations for TRACE (default: 3, only used with --use_trace)."
+    )
+
     args = parser.parse_args()
     
     device = torch.device(args.device)
@@ -320,44 +375,74 @@ def main():
         device=device,
         mode="eval"
     )
-    
-    # 如果是训练checkpoint，需要加载state_dict
-    try:
-        checkpoint = torch.load(checkpoint_path, map_location=device)
-        if "model" in checkpoint:
-            sam2_model.load_state_dict(checkpoint["model"], strict=False)
-            print("Loaded model weights from training checkpoint")
-    except Exception as e:
-        print(f"Warning: Could not load checkpoint as training checkpoint: {e}")
-        print("Using checkpoint as pretrained model")
-    
-    # 创建数据集路径
-    dataset_dir = os.path.join("./2D_data", args.data, "test")
-    
-    # 获取图像和mask路径
-    image_paths, mask_paths = get_image_mask_paths(dataset_dir)
-    
-    print(f"Test samples: {len(image_paths)}")
-    
-    # 获取annotation路径
-    if args.ref_type == 'middle':
-        annotation_path = os.path.join(dataset_dir, "annotation_dict_middle.json")
+
+    if args.use_trace:
+        if not args.model_ckpt:
+            raise ValueError("--use_trace requires --model_ckpt to point at a trained MedSAM2 + TRACE checkpoint.")
+        class _RefinementConfig:
+            classifier = None
+        refinement_module = TRACE(_RefinementConfig(), img_size=args.image_size, pretrained=True)
+        model = MedSAM2_with_TRACE(
+            sam2_model=sam2_model,
+            refinement=refinement_module,
+            refine_iters=args.refine_iters,
+            detach_between_iters=True,
+        )
+        print(f"Loading trained MedSAM2 + TRACE checkpoint from {args.model_ckpt}")
+        trace_ckpt = torch.load(args.model_ckpt, map_location=device)
+        model.load_state_dict(trace_ckpt.get("model", trace_ckpt), strict=False)
+        model = model.to(device)
+        model.eval()
+        dataset_dir = os.path.join("./2D_data", args.data)
+        test_dataset = MedSAM2_2D_Dataset(
+            base_dir=dataset_dir,
+            mode="test",
+            ref_type=args.ref_type,
+            image_size=args.image_size,
+            bbox_shift=0,
+            use_augmentation=False,
+        )
+        print(f"Test samples: {len(test_dataset)}")
+        test_dataloader = DataLoader(
+            test_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=True,
+        )
+        print(f"\n{'='*50}\nEvaluating MedSAM2 + TRACE on {args.data} ({args.ref_type})\n{'='*50}")
+        avg_iou, avg_dice = eval_model_trace(model, test_dataloader, device, image_size=args.image_size)
+        num_samples_for_log = len(test_dataset)
     else:
-        annotation_path = os.path.join(dataset_dir, "annotation_dict_neighbor.json")
-    
-    # 评估模型
-    print(f"\n{'='*50}")
-    print(f"Evaluating on {args.data} dataset (ref_type: {args.ref_type})")
-    print(f"{'='*50}")
-    
-    avg_iou, avg_dice = eval_model(
-        sam2_model,
-        image_paths,
-        mask_paths,
-        annotation_path,
-        device,
-        image_size=args.image_size
-    )
+        # Baseline path: optionally overlay a finetune checkpoint onto build_sam2's weights.
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+            if "model" in checkpoint:
+                sam2_model.load_state_dict(checkpoint["model"], strict=False)
+                print("Loaded model weights from training checkpoint")
+        except Exception as e:
+            print(f"Warning: Could not load checkpoint as training checkpoint: {e}")
+            print("Using checkpoint as pretrained model")
+
+        dataset_dir = os.path.join("./2D_data", args.data, "test")
+        image_paths, mask_paths = get_image_mask_paths(dataset_dir)
+        print(f"Test samples: {len(image_paths)}")
+
+        if args.ref_type == 'middle':
+            annotation_path = os.path.join(dataset_dir, "annotation_dict_middle.json")
+        else:
+            annotation_path = os.path.join(dataset_dir, "annotation_dict_neighbor.json")
+
+        print(f"\n{'='*50}\nEvaluating baseline MedSAM2 on {args.data} ({args.ref_type})\n{'='*50}")
+        avg_iou, avg_dice = eval_model(
+            sam2_model,
+            image_paths,
+            mask_paths,
+            annotation_path,
+            device,
+            image_size=args.image_size,
+        )
+        num_samples_for_log = len(image_paths)
     
     print(f"\n{'='*50}")
     print(f"Evaluation Results:")
@@ -370,15 +455,18 @@ def main():
     results = {
         "dataset": args.data,
         "ref_type": args.ref_type,
+        "use_trace": bool(args.use_trace),
         "checkpoint": checkpoint_path,
+        "model_ckpt": args.model_ckpt if args.use_trace else None,
         "avg_iou": float(avg_iou),
         "avg_dice": float(avg_dice),
-        "num_samples": len(image_paths)
+        "num_samples": int(num_samples_for_log),
     }
-    
+
     results_dir = os.path.join(medsam2_root, "results")
     os.makedirs(results_dir, exist_ok=True)
-    results_file = os.path.join(results_dir, f"results_{args.data}_{args.ref_type}.json")
+    suffix = "with_TRACE" if args.use_trace else "baseline"
+    results_file = os.path.join(results_dir, f"results_{args.data}_{args.ref_type}_{suffix}.json")
     
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
