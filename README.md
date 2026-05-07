@@ -78,11 +78,52 @@ pip install -e .
 conda env create -f medsam.yaml
 ```
 
-## 5. Data preparation
+## 5. Data and pretrained weights
 
-This repository does **not** redistribute datasets. See [`docs/data_preprocessing.md`](docs/data_preprocessing.md) for download links and the conversion pipeline producing the expected `2D_data/<dataset>/<split>/{CT,Mask}/<patient>/*.png` layout, plus the JSON reference-slice annotations (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`).
+This repository does **not** redistribute datasets or trained checkpoints. You must obtain them separately.
 
-Pretrained ImageNet checkpoints for the 7 CNN backbones (TransUNet, SwinUNet, ResNet-34) must be placed under `tumor_seg/networks/`. MedSAM and MedSAM2 vendor weights are obtained from their respective upstream repositories.
+### 5.1 Datasets
+
+See [`docs/data_preprocessing.md`](docs/data_preprocessing.md) for download links and the conversion pipeline producing the expected `2D_data/<dataset>/<split>/{CT,Mask}/<patient>/*.png` layout, plus the JSON reference-slice annotations (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`).
+
+### 5.2 ImageNet-pretrained backbone weights (for the 7 CNNs)
+
+Required to initialise the 7 CNN backbones at training time. Download each file and place it at the listed path **relative to the repository root**. All commands below assume you run from the repo root.
+
+| Backbone | File | Source | Place at |
+|---|---|---|---|
+| **TransUNet** | `R50+ViT-B_16.npz` | Google ViT release: `https://console.cloud.google.com/storage/vit_models/imagenet21k/` (download `R50+ViT-B_16.npz`) | `./model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz` |
+| **SwinUNet** | `swin_tiny_patch4_window7_224.pth` | Microsoft Swin Transformer: `https://github.com/microsoft/Swin-Transformer` → "Swin-T (ImageNet-1k pretrained)" | `./tumor_seg/networks/swin_tiny_patch4_window7_224.pth` |
+| **MedFormer / AttentionUNet / UNet++ / FATNet / H2Former** | `resnet34.pth` | torchvision: `https://download.pytorch.org/models/resnet34-b627a593.pth` (rename to `resnet34.pth` after download) | `./tumor_seg/networks/resnet34.pth` |
+
+Quick command sketch:
+
+```bash
+mkdir -p ./model/vit_checkpoint/imagenet21k ./tumor_seg/networks
+
+# TransUNet ImageNet-21k init (manual download from Google Cloud Storage; needs a browser)
+# Place R50+ViT-B_16.npz under ./model/vit_checkpoint/imagenet21k/
+
+# SwinUNet (manual download from Microsoft's release page)
+# Place swin_tiny_patch4_window7_224.pth under ./tumor_seg/networks/
+
+# ResNet-34 (direct curl)
+curl -L -o ./tumor_seg/networks/resnet34.pth \
+    https://download.pytorch.org/models/resnet34-b627a593.pth
+```
+
+### 5.3 Foundation-model weights (for MedSAM and MedSAM2)
+
+| Backbone | File | Source | Place at |
+|---|---|---|---|
+| **MedSAM** | `medsam_vit_b.pth` | Wang Lab MedSAM: `https://github.com/bowang-lab/MedSAM` → "Pre-trained weights" (Google Drive link in upstream README) | `./third_party/medsam/medsam_vit_b.pth` |
+| **MedSAM2** | `MedSAM2_latest.pt` | Wang Lab MedSAM2: `https://github.com/bowang-lab/MedSAM2` → "Checkpoints" (HuggingFace Hub link in upstream README) | `./third_party/medsam2/checkpoints/MedSAM2_latest.pt` |
+
+Both vendored READMEs (`third_party/medsam/README.md`, `third_party/medsam2/README.md`) carry the upstream download instructions verbatim — defer to them if upstream URLs change.
+
+### 5.4 Trained TRACE checkpoints
+
+We do **not** redistribute the trained TRACE checkpoints (~7 backbones × 5 datasets × 2 variants for the CNN family alone). Recreate them by running `tumor_seg/train.py` per the Quick Start (§6.1); expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU. The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; see `MODEL_REGISTRY`-style subdirectory naming inside `simulation.py` (`TU_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
 
 ## 6. Quick start
 
@@ -138,8 +179,8 @@ Compares Mode A (no AI) vs Mode B (AI-assisted) edit effort using FN-rate, FP-ra
 - `third_party/medsam/My_utils.py` — adds `class TRACE` and `MedSAM_v6554` (= MedSAM + TRACE)
 - `third_party/medsam/train_one_gpu.py`, `test_ref_finetune.py` — TRACE-aware training/testing
 - `third_party/medsam2/training/model/trace.py` — TRACE for MedSAM2
-- `third_party/medsam2/training/model/medsam2_v6554.py` — MedSAM2 + TRACE
-- `third_party/medsam2/train_medsam2_2d_v6554.py`, `test_medsam2_2d_v6554.py` — TRACE-aware training/testing
+- `third_party/medsam2/training/model/medsam2_with_trace.py` — MedSAM2 + TRACE
+- `third_party/medsam2/train_medsam2_2d_with_trace.py`, `test_medsam2_2d_with_trace.py` — TRACE-aware training/testing
 
 ## 8. Citation
 

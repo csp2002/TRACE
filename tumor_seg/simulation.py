@@ -27,17 +27,17 @@ import argparse
 import matplotlib.pyplot as plt
 
 # Traditional models
-from networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
-from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
-from networks.medformer import MedFormer,MedFormer_ours
-from networks.attention_unet import AttentionUNet,AttentionUNet_ours
-from networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
-from networks.swin_unet import SwinUnet,SwinUnet_ours
-from networks.swin_unet import SwinUnet_config
-from networks.FAT_Net import FAT_Net,FATNet_ours
-from networks.MISSFormer import MISSFormer
-from networks.H2Former import res34_swin_MS,H2Former_ours
+from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
+from .networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
+from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
+from .networks.medformer import MedFormer,MedFormer_ours
+from .networks.attention_unet import AttentionUNet,AttentionUNet_ours
+from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
+from .networks.swin_unet import SwinUnet,SwinUnet_ours
+from .networks.swin_unet import SwinUnet_config
+from .networks.FAT_Net import FAT_Net,FATNet_ours
+from .networks.MISSFormer import MISSFormer
+from .networks.H2Former import res34_swin_MS,H2Former_ours
 
 # MedSAM imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../third_party/medsam'))
@@ -49,7 +49,7 @@ import torch.nn as nn
 # MedSAM2 imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../third_party/medsam2'))
 from sam2.build_sam import build_sam2
-from training.model.medsam2_v6554 import MedSAM2_v6554
+from training.model.medsam2_with_trace import MedSAM2_v6554
 from training.model.trace import TRACE as medsam2_TRACE
 from sam2.utils.transforms import SAM2Transforms
 
@@ -927,7 +927,7 @@ class DoctorSimTester:
                 ref_img_tensor = ref_img_tensor.to(self.dev)
                 ref_gt_tensor = ref_gt_tensor.to(self.dev)
                 
-                # Forward pass (boxes as numpy array (1, 4), like test_medsam2_2d_v6554.py)
+                # Forward pass (boxes as numpy array (1, 4), like test_medsam2_2d_with_trace.py)
                 with torch.no_grad():
                     output = model(img_tensor, box_np, ref_img_tensor, ref_gt_tensor, image_size=512)
                     if isinstance(output, dict):

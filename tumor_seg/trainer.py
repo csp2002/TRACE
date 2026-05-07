@@ -14,12 +14,12 @@ from tensorboardX import SummaryWriter
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from utils import DiceLoss
+from .utils import DiceLoss
 from torchvision import transforms
 
 def trainer_synapse(args, model, snapshot_path):
-    from datasets.dataset_synapse import Synapse_dataset, RandomGenerator, RandomGenerator_ref
-    from datasets.dataset_synapse import Dataset_sli2vol, Dataset_vol2flow, Dataset_v5, Dataset_v5_2, Dataset_v6, Dataset_v6_2, Dataset_v6_5
+    from .datasets.dataset_synapse import Synapse_dataset, RandomGenerator, RandomGenerator_ref
+    from .datasets.dataset_synapse import Dataset_sli2vol, Dataset_vol2flow, Dataset_v5, Dataset_v5_2, Dataset_v6, Dataset_v6_2, Dataset_v6_5
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))

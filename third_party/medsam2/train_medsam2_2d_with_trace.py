@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2
 from training.dataset.medsam2_2d_dataset import MedSAM2_2D_Dataset
-from training.model.medsam2_v6554 import MedSAM2_v6554
+from training.model.medsam2_with_trace import MedSAM2_v6554
 from training.model.trace import TRACE
 from training.loss_fns import dice_loss, sigmoid_focal_loss
 

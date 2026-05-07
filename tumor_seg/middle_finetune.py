@@ -23,9 +23,9 @@ from PIL import Image
 from scipy.ndimage import zoom
 from torch.nn.modules.loss import CrossEntropyLoss
 
-from networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
-from utils import DiceLoss
+from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
+from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
+from .utils import DiceLoss
 
 
 def compute_metrics(pred, target, smooth=1e-6):

@@ -9,20 +9,20 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from datasets.dataset_synapse import *
-from utils import test_single_volume
-from networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from networks.vit_seg_modeling import My_VisionTransformer as My_ViT_seg
-from networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
-from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
-from networks.medformer import MedFormer,MedFormer_ours
-from networks.attention_unet import AttentionUNet,AttentionUNet_ours
-from networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
-from networks.swin_unet import SwinUnet,SwinUnet_ours
-from networks.swin_unet import SwinUnet_config
-from networks.FAT_Net import FAT_Net,FATNet_ours
-from networks.MISSFormer import MISSFormer
-from networks.H2Former import res34_swin_MS,H2Former_ours
+from .datasets.dataset_synapse import *
+from .utils import test_single_volume
+from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
+from .networks.vit_seg_modeling import My_VisionTransformer as My_ViT_seg
+from .networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
+from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
+from .networks.medformer import MedFormer,MedFormer_ours
+from .networks.attention_unet import AttentionUNet,AttentionUNet_ours
+from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
+from .networks.swin_unet import SwinUnet,SwinUnet_ours
+from .networks.swin_unet import SwinUnet_config
+from .networks.FAT_Net import FAT_Net,FATNet_ours
+from .networks.MISSFormer import MISSFormer
+from .networks.H2Former import res34_swin_MS,H2Former_ours
 from PIL import Image
 
 
