@@ -3,7 +3,7 @@
 ## 1. Repository layout
 
 ```
-TRACE_github/
+TRACE/
 ├── data_preparation/
 │   ├── nifti_to_2d.py
 │   ├── extract_middle_slice.py
@@ -31,8 +31,8 @@ TRACE_github/
 ## 2. Installation
 
 ```bash
-git clone https://github.com/csp2002/TRACE_github.git
-cd TRACE_github
+git clone https://github.com/csp2002/TRACE.git
+cd TRACE
 
 # Environment for the 7 conventional models + simulation framework
 conda env create -f TRACE.yaml
