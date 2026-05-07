@@ -21,7 +21,7 @@ from PIL import Image
 import math
 import copy
 from vit_seg_modeling_resnet_skip import ResNetV2, ResNetV3
-class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middle slice as reference
+class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, middle slice as reference
     def __init__(self, base_dir, mode):
         
         # self.split = split
@@ -226,7 +226,7 @@ class Dataset_v6_2(Dataset):   #use middle slice GT to extract box prompt, middl
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-class Dataset_v9(Dataset):   # use NEIGHBOR slice GT to extract box prompt, neighbor slice as reference
+class Dataset_neighbor(Dataset):   # use NEIGHBOR slice GT to extract box prompt, neighbor slice as reference
     def __init__(self, base_dir, mode):
         self.data_dir = base_dir
         self.dataset = base_dir.split('/')[-1]

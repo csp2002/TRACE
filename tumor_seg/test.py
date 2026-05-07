@@ -225,10 +225,10 @@ if __name__ == "__main__":
     # args.volume_path = dataset_config[dataset_name]['volume_path']
     # args.Dataset = dataset_config[dataset_name]['Dataset']
     if args.test_ref == 'middle':
-        args.Dataset = Dataset_v5_2
+        args.Dataset = Dataset_middle
         print('Using middle-slice reference dataset')
     elif args.test_ref == 'neighbor':
-        args.Dataset = Dataset_v6_5
+        args.Dataset = Dataset_neighbor
         print('Using neighbor-slice reference dataset')
     else:
         args.Dataset = Synapse_dataset

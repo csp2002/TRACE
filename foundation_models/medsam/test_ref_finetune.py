@@ -215,10 +215,10 @@ def main():
     }
     root_path = dataset_config[args.data]['root_path']
     if args.ref == 'middle':
-        test_dataset = Dataset_v6_2(base_dir=root_path, mode='test')
+        test_dataset = Dataset_middle(base_dir=root_path, mode='test')
         print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
-        test_dataset = Dataset_v9(base_dir=root_path, mode='test')
+        test_dataset = Dataset_neighbor(base_dir=root_path, mode='test')
         print('Using neighbor-slice reference dataset')
     else:
         raise ValueError(

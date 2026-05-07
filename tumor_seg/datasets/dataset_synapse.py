@@ -203,7 +203,7 @@ class Synapse_dataset(Dataset):
         #打印sample的所有key
         # print('sample:', sample.keys())
         return sample
-class Dataset_v5_2(Dataset):   # use middle slice as reference image
+class Dataset_middle(Dataset):   # use middle slice as reference image
     def __init__(self, base_dir, mode, transform=None):
         self.transform = transform
         self.data_dir = base_dir
@@ -294,7 +294,7 @@ class Dataset_v5_2(Dataset):   # use middle slice as reference image
         sample['image_path'] = image_path
         sample['orig_size'] = np.array([x, y])  # original H, W before zoom to 224
         return sample
-class Dataset_v6_5(Dataset):   # use NEIGHBOR slice as reference image (from json)
+class Dataset_neighbor(Dataset):   # use NEIGHBOR slice as reference image (from json)
     def __init__(self, base_dir, mode, transform=None):
         self.transform = transform
         self.data_dir = base_dir

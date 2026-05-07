@@ -271,13 +271,13 @@ def main():
     }
     root_path = dataset_config[args.data]['root_path']
     if args.ref == 'neighbor':
-        train_dataset = Dataset_v9(
+        train_dataset = Dataset_neighbor(
             base_dir=root_path,
             mode='train'
         )
         print('Using neighbor-slice reference dataset')
     elif args.ref == 'middle':
-        train_dataset = Dataset_v6_2(
+        train_dataset = Dataset_middle(
             base_dir=root_path,
             mode='train'
         )

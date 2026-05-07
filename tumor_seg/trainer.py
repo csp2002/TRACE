@@ -19,7 +19,7 @@ from torchvision import transforms
 
 def trainer_synapse(args, model, snapshot_path):
     from .datasets.dataset_synapse import Synapse_dataset, RandomGenerator, RandomGenerator_ref
-    from .datasets.dataset_synapse import Dataset_v5_2, Dataset_v6_5
+    from .datasets.dataset_synapse import Dataset_middle, Dataset_neighbor
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -29,12 +29,12 @@ def trainer_synapse(args, model, snapshot_path):
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
     if args.ref == 'middle':
-        db_train = Dataset_v5_2(base_dir=args.root_path,
+        db_train = Dataset_middle(base_dir=args.root_path,
                                 transform=transforms.Compose(
                                     [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
         print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
-        db_train = Dataset_v6_5(base_dir=args.root_path,
+        db_train = Dataset_neighbor(base_dir=args.root_path,
                                 transform=transforms.Compose(
                                     [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
         print('Using neighbor-slice reference dataset')
