@@ -169,13 +169,13 @@ def main():
         config_small.n_classes = 2
         config_small.n_skip = 3
         config_small.patches.grid = (int(1024 / 16), int(1024 / 16))
-        medsam_model = MedSAM_v6554(
+        medsam_model = MedSAM_with_TRACE(
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
             refinement = TRACE(config_small),
         )
-        print('Using MedSAM_v6554 with TRACE')
+        print('Using MedSAM_with_TRACE with TRACE')
     else:
         medsam_model = MedSAM(
             image_encoder=sam_model.image_encoder,
@@ -272,7 +272,7 @@ def main():
             medsam_pred, ori_res_masks = medsam_model(image, boxes_np, ref_gt)
         elif 'vol2flow_v3o2' in args.task_name:
             medsam_pred, ori_res_masks, modulation_map, foreground_mask = medsam_model(image, boxes_np, ref_gt)
-        elif 'v6554' in args.task_name:
+        elif 'with_trace' in args.task_name:
                     # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
                     # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
             outputs = medsam_model(image, boxes_np, ref_img, ref_gt)

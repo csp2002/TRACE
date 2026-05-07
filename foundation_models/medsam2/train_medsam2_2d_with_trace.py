@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 2D训练脚本 - v6554实验
+MedSAM2 2D training script — TRACE variant
 包含 adds-on refinement module + iterative refinement + deep supervision
 使用middle或neighbor slice的GT Mask提取box prompt进行训练
 """
@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2
 from training.dataset.medsam2_2d_dataset import MedSAM2_2D_Dataset
-from training.model.medsam2_with_trace import MedSAM2_v6554
+from training.model.medsam2_with_trace import MedSAM2_with_TRACE
 from training.model.trace import TRACE
 from training.loss_fns import dice_loss, sigmoid_focal_loss
 
@@ -36,9 +36,9 @@ if torch.cuda.is_available():
     torch.cuda.manual_seed_all(2023)
 
 
-def compute_loss_v6554(preds_all, gt_masks, num_objects, weight_dict=None):
+def compute_loss_with_trace(preds_all, gt_masks, num_objects, weight_dict=None):
     """
-    计算v6554的loss（deep supervision：所有迭代的输出都参与loss计算）
+    Compute the TRACE-variant loss（deep supervision：所有迭代的输出都参与loss计算）
     使用MedSAM2的loss函数：focal loss + dice loss，权重比例20:1
     
     Args:
@@ -123,9 +123,9 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
         masks = batch['mask'].to(device)  # (B, 1, H, W), float [0, 1]
         bboxes = batch['bbox'].cpu().numpy()  # (B, 4), numpy [x_min, y_min, x_max, y_max]
         
-        # v6554需要的额外数据
+        # extra data needed by the TRACE variant
         if 'ref_image' not in batch or 'ref_gt' not in batch:
-            raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for v6554 experiment")
+            raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for the TRACE variant")
         
         ref_images = batch['ref_image'].to(device)  # (B, 3, H, W), float, normalized
         ref_gts = batch['ref_gt'].to(device)  # (B, 1, H, W), float [0, 1]
@@ -141,7 +141,7 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
                 
                 # 计算loss（deep supervision）
                 num_objects = float(batch_size)
-                total_loss_val, focal_loss, dice_loss_val = compute_loss_v6554(
+                total_loss_val, focal_loss, dice_loss_val = compute_loss_with_trace(
                     outputs['iters'], masks, num_objects
                 )
             
@@ -156,7 +156,7 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
             
             # 计算loss（deep supervision）
             num_objects = float(batch_size)
-            total_loss_val, focal_loss, dice_loss_val = compute_loss_v6554(
+            total_loss_val, focal_loss, dice_loss_val = compute_loss_with_trace(
                 outputs['iters'], masks, num_objects
             )
             
@@ -183,7 +183,7 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train MedSAM2 v6554 on 2D medical images")
+    parser = argparse.ArgumentParser(description="Train MedSAM2 + TRACE on 2D medical images")
     parser.add_argument(
         "--data", 
         type=str, 
@@ -296,7 +296,7 @@ def main():
     args = parser.parse_args()
     
     # 创建输出目录
-    task_name = f"MedSAM2-2D-v6554-{args.data}-{args.ref_type}"
+    task_name = f"MedSAM2-2D-with_TRACE-{args.data}-{args.ref_type}"
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     model_save_path = os.path.join(args.work_dir, task_name, run_id)
     os.makedirs(model_save_path, exist_ok=True)
@@ -337,8 +337,8 @@ def main():
         pretrained=True
     )
     
-    # 创建MedSAM2_v6554模型
-    medsam2_v6554_model = MedSAM2_v6554(
+    # Build MedSAM2 + TRACE model
+    model = MedSAM2_with_TRACE(
         sam2_model=sam2_model,
         refinement=refinement_module,
         refine_iters=args.refine_iters,
@@ -346,16 +346,16 @@ def main():
     )
     
     # 打印模型参数
-    total_params = sum(p.numel() for p in medsam2_v6554_model.parameters())
-    trainable_params = sum(p.numel() for p in medsam2_v6554_model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Total parameters: {total_params / 1e6:.2f}M")
     print(f"Trainable parameters: {trainable_params / 1e6:.2f}M")
     
     # 冻结SAM2（如果需要）
     if args.freeze_sam2:
-        for param in medsam2_v6554_model.sam2_model.parameters():
+        for param in model.sam2_model.parameters():
             param.requires_grad = False
-        for param in medsam2_v6554_model.refinement.parameters():
+        for param in model.refinement.parameters():
             param.requires_grad = True
         print("Frozen SAM2 model, only training refinement module")
     
@@ -385,7 +385,7 @@ def main():
     refinement_params = []
     other_params = []
     
-    for name, param in medsam2_v6554_model.named_parameters():
+    for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
         if 'image_encoder' in name or 'sam2_model.image_encoder' in name:
@@ -433,11 +433,11 @@ def main():
         if os.path.isfile(args.resume):
             checkpoint = torch.load(args.resume, map_location=device)
             start_epoch = checkpoint.get("epoch", 0) + 1
-            medsam2_v6554_model.load_state_dict(checkpoint.get("model", checkpoint))
+            model.load_state_dict(checkpoint.get("model", checkpoint))
             optimizer.load_state_dict(checkpoint.get("optimizer", {}))
             print(f"Resumed from epoch {start_epoch}")
     
-    medsam2_v6554_model = medsam2_v6554_model.to(device)
+    model = model.to(device)
     
     # 训练循环
     losses = []
@@ -451,7 +451,7 @@ def main():
         print(f"{'='*50}")
         
         avg_loss, avg_focal, avg_dice = train_one_epoch(
-            medsam2_v6554_model, 
+            model, 
             train_dataloader, 
             optimizer, 
             device, 
@@ -468,7 +468,7 @@ def main():
         
         # 保存checkpoint
         checkpoint = {
-            "model": medsam2_v6554_model.state_dict(),
+            "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "epoch": epoch,
             "loss": avg_loss,

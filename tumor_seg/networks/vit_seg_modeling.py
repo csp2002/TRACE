@@ -13481,10 +13481,10 @@ class My_VisionTransformer_v6553(nn.Module):
 
 
 
-class My_VisionTransformer_v6554(nn.Module):  
+class TransUNet_ours(nn.Module):  
     def __init__(self, config, config_small, img_size=224, num_classes=21843, zero_head=False, vis=False, refine_iters = 3,
             detach_between_iters = True):
-        super(My_VisionTransformer_v6554, self).__init__()
+        super(TransUNet_ours, self).__init__()
         self.num_classes = num_classes   #csp: seems no use
         self.zero_head = zero_head
         self.classifier = config.classifier

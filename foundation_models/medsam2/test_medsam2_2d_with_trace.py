@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 2D测试脚本 - v6554实验
-用于评估训练后的MedSAM2 v6554模型性能
+MedSAM2 2D test script — TRACE variant
+Evaluate the trained MedSAM2 + TRACE model.
 """
 
 import os
@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2
 from training.dataset.medsam2_2d_dataset import MedSAM2_2D_Dataset
-from training.model.medsam2_with_trace import MedSAM2_v6554
+from training.model.medsam2_with_trace import MedSAM2_with_TRACE
 from training.model.trace import TRACE
 from torch.utils.data import DataLoader
 
@@ -67,7 +67,7 @@ def eval_model(model, dataloader, device, image_size=512):
     评估模型性能
     
     Args:
-        model: MedSAM2_v6554模型
+        model: MedSAM2 + TRACE model
         dataloader: 数据加载器
         device: 设备
         image_size: 图像尺寸
@@ -88,9 +88,9 @@ def eval_model(model, dataloader, device, image_size=512):
             masks = batch['mask'].to(device)  # (B, 1, H, W)
             bboxes = batch['bbox'].cpu().numpy()  # (B, 4)
             
-            # v6554需要的额外数据
+            # extra data needed by the TRACE variant
             if 'ref_image' not in batch or 'ref_gt' not in batch:
-                raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for v6554 experiment")
+                raise ValueError("Dataset must return 'ref_image' and 'ref_gt' for the TRACE variant")
             
             ref_images = batch['ref_image'].to(device)  # (B, 3, H, W)
             ref_gts = batch['ref_gt'].to(device)  # (B, 1, H, W)
@@ -122,7 +122,7 @@ def eval_model(model, dataloader, device, image_size=512):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Test MedSAM2 v6554 on 2D medical images")
+    parser = argparse.ArgumentParser(description="Test MedSAM2 + TRACE on 2D medical images")
     parser.add_argument(
         "--data", 
         type=str, 
@@ -153,7 +153,7 @@ def main():
         "--model_ckpt",
         type=str,
         required=True,
-        help="Path to trained v6554 model checkpoint"
+        help="Path to trained MedSAM2 + TRACE checkpoint"
     )
     parser.add_argument(
         "--device",
@@ -214,8 +214,8 @@ def main():
         pretrained=True
     )
     
-    # 创建MedSAM2_v6554模型
-    model = MedSAM2_v6554(
+    # Build MedSAM2 + TRACE model
+    model = MedSAM2_with_TRACE(
         sam2_model=sam2_model,
         refinement=refinement_module,
         refine_iters=args.refine_iters,

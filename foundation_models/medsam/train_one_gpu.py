@@ -185,18 +185,18 @@ def main():
             prompt_encoder=sam_model.prompt_encoder,
             refinement = refinement_v4(),
         )
-    elif 'v6554' in args.task_name:
+    elif 'with_trace' in args.task_name:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
         config_small.n_skip = 3
         config_small.patches.grid = (int(1024 / 16), int(1024 / 16))
-        medsam_model = MedSAM_v6554(
+        medsam_model = MedSAM_with_TRACE(
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
             refinement = TRACE(config_small),
         )
-        print('Using MedSAM_v6554 with TRACE')
+        print('Using MedSAM_with_TRACE with TRACE')
     else:
         medsam_model = MedSAM(
             image_encoder=sam_model.image_encoder,
@@ -382,7 +382,7 @@ def main():
                         # print('foreground_mask:', ref_mask.shape, foreground_mask.max(), foreground_mask.min())
                         loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
                         # print('modulation_map or foreground_mask out of range in '+ img_name[0] + 'or '+ img_name[1])
-                elif 'v6554' in args.task_name:
+                elif 'with_trace' in args.task_name:
                     # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
                     # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                     outputs = medsam_model(image, boxes_np, ref_img, ref_gt)

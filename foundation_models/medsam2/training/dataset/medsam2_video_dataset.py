@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 Video训练数据集（用于v6554实验）
+MedSAM2 Video training dataset（for the TRACE variant）
 将2D数据组织为video格式：每个病人的所有slice作为一个video
 使用middle slice的GT作为reference
 """
@@ -61,7 +61,7 @@ class MedSAM2VideoSegmentLoader:
 
 class MedSAM2VideoRawDataset(VOSRawDataset):
     """
-    Video dataset for MedSAM2 v6554 experiment
+    Video dataset for MedSAM2 + TRACE
     将2D数据组织为video格式：每个病人的所有slice作为一个video
     每个slice作为一个frame
     """

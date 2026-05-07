@@ -80,7 +80,7 @@ trainer:
     detach_between_iters: true
     freeze_prompt_encoder: true
     refinement:
-      _target_: training.model.refinement_v6554.refinement_v57
+      _target_: training.model.trace.TRACE
       config: null
       img_size: ${scratch.resolution}
       pretrained: true

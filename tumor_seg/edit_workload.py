@@ -23,7 +23,7 @@ import argparse
 import matplotlib.pyplot as plt
 
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from .networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
+from .networks.vit_seg_modeling import TransUNet_ours as TransUNet_ours
 from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from .networks.medformer import MedFormer,MedFormer_ours
 from .networks.attention_unet import AttentionUNet,AttentionUNet_ours
@@ -38,14 +38,14 @@ from .networks.H2Former import res34_swin_MS,H2Former_ours
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam'))
 from segment_anything import sam_model_registry
 import vit_seg_configs as medsam_configs
-from My_utils import MedSAM_v6554, TRACE
+from My_utils import MedSAM_with_TRACE, TRACE
 import torch.nn as nn
 
 # MedSAM2 imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2'))
 from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
-from training.model.medsam2_with_trace import MedSAM2_v6554
+from training.model.medsam2_with_trace import MedSAM2_with_TRACE
 from training.model.trace import TRACE as medsam2_TRACE
 
 
@@ -424,7 +424,7 @@ class EditWorkloadTester:
         assert self.model_type in ["traditional", "medsam", "medsam2"], f"model_type must be 'traditional', 'medsam', or 'medsam2', got {model_type}"
         
         # For MedSAM2, create image predictor only for model1 (standard MedSAM2)
-        # Model2 (MedSAM2_v6554) has different forward signature, so we use it directly
+        # Model2 (MedSAM2_with_TRACE) has different forward signature, so we use it directly
         if self.model_type == "medsam2":
             self.medsam2_predictor1 = SAM2ImagePredictor(self.m1)
 
@@ -651,7 +651,7 @@ class EditWorkloadTester:
             box_1024 = box_prompt / np.array([W, H, W, H]) * 1024  # (1, 4)
 
             if need_ref:
-                # MedSAM_v6554 (model2): direct forward call, box_np (1, 4) like simulation_v3.py
+                # MedSAM_with_TRACE (model2): direct forward call, box_np (1, 4) like simulation.py
                 ref_name = slices[ref_idx]
                 ref_ct_path = os.path.join(ct_dir, ref_name)
                 ref_mk_path = os.path.join(mk_dir, ref_name)
@@ -678,7 +678,7 @@ class EditWorkloadTester:
                     pred_np = (pred_mask[0] > 0.5).astype(np.float32)
                     pred_np = cv2.resize(pred_np, (W, H), interpolation=cv2.INTER_NEAREST)
             else:
-                # Standard MedSAM (model1): use MedSAM_Wrapper forward like simulation_v3.py
+                # Standard MedSAM (model1): use MedSAM_Wrapper forward like simulation.py
                 box_np = box_1024[0] if len(box_1024.shape) == 2 else box_1024  # (4,)
                 with torch.no_grad():
                     ori_res_masks = model(img_1024_tensor, box_np)
@@ -711,7 +711,7 @@ class EditWorkloadTester:
                     box_prompt = medsam2_extract_box_from_mask(current_mask_uint8, image_size=512)
             
             if need_ref:
-                # Model2 (MedSAM2_v6554): direct forward call
+                # Model2 (MedSAM2_with_TRACE): direct forward call
                 ref_name = slices[ref_idx]
                 ref_ct_path = os.path.join(ct_dir, ref_name)
                 ref_mk_path = os.path.join(mk_dir, ref_name)
@@ -853,7 +853,7 @@ if __name__ == "__main__":
             config_small.n_classes = num_classes
             config_small.n_skip = n_skip
             config_small.patches.grid = (int(img_size / vit_patches_size), int(img_size / vit_patches_size))
-            model2 = My_ViT_seg_v6554(config_vit, config_small, img_size=img_size, num_classes=config_vit.n_classes).cuda()
+            model2 = TransUNet_ours(config_vit, config_small, img_size=img_size, num_classes=config_vit.n_classes).cuda()
 
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
@@ -981,7 +981,7 @@ if __name__ == "__main__":
             sam_model1 = sam_model_registry["vit_b"](checkpoint=medsam_base_ckpt).to(device)
             sam_model2 = sam_model_registry["vit_b"](checkpoint=medsam_base_ckpt).to(device)
 
-            # Model1: standard MedSAM (neighbor version, no v6554) - use MedSAM_Wrapper like simulation_v3.py
+            # Model1: standard MedSAM (neighbor version, no TRACE) - use MedSAM_Wrapper like simulation.py
             model1 = MedSAM_Wrapper(
                 image_encoder=sam_model1.image_encoder,
                 mask_decoder=sam_model1.mask_decoder,
@@ -996,19 +996,19 @@ if __name__ == "__main__":
             model1 = model1.to(device).eval()
             print("Loaded MedSAM model1 ckpt:", ckpt_path1)
 
-            # Model2: MedSAM_v6554 (neighbor)
+            # Model2: MedSAM_with_TRACE (neighbor)
             config_small = medsam_configs.get_r18_s16_config()
             config_small.n_classes = 2
             config_small.n_skip = 3
             config_small.patches.grid = (int(1024 / 16), int(1024 / 16))
             refinement_mod = TRACE(config_small, img_size=1024, num_classes=2, pretrained=True)
-            model2 = MedSAM_v6554(
+            model2 = MedSAM_with_TRACE(
                 image_encoder=sam_model2.image_encoder,
                 mask_decoder=sam_model2.mask_decoder,
                 prompt_encoder=sam_model2.prompt_encoder,
                 refinement=refinement_mod,
             )
-            ckpt_path2_pattern = os.path.join(medsam_root, "work_dir", f"v6554_neighbor-{dataset_name}-*", "medsam_model_best.pth")
+            ckpt_path2_pattern = os.path.join(medsam_root, "work_dir", f"with_TRACE_neighbor-{dataset_name}-*", "medsam_model_best.pth")
             ckpt_path2_list = glob.glob(ckpt_path2_pattern)
             if not ckpt_path2_list:
                 raise FileNotFoundError(f"Cannot find model2 checkpoint matching pattern: {ckpt_path2_pattern}")
@@ -1027,7 +1027,7 @@ if __name__ == "__main__":
             else:
                 cfg_path = medsam2_cfg
             
-            # Model1: standard MedSAM2 (neighbor, no v6554)
+            # Model1: standard MedSAM2 (neighbor, no TRACE)
             ckpt_path1_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-{dataset_name}-neighbor", "*", "best.pth")
             ckpt_path1_list = glob.glob(ckpt_path1_pattern)
             if not ckpt_path1_list:
@@ -1048,7 +1048,7 @@ if __name__ == "__main__":
                 model1.load_state_dict(checkpoint1, strict=False)
             print("Loaded MedSAM2 model1 ckpt:", ckpt_path1)
             
-            # Model2: MedSAM2_v6554 (neighbor)
+            # Model2: MedSAM2_with_TRACE (neighbor)
             sam2_base = build_sam2(
                 config_file=cfg_path,
                 ckpt_path=None,
@@ -1074,14 +1074,14 @@ if __name__ == "__main__":
                 pretrained=True
             )
             
-            model2 = MedSAM2_v6554(
+            model2 = MedSAM2_with_TRACE(
                 sam2_model=sam2_base,
                 refinement=refinement_module,
                 refine_iters=3,
                 detach_between_iters=True
             )
             
-            ckpt_path2_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-v6554-{dataset_name}-neighbor", "*", "best.pth")
+            ckpt_path2_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-with_TRACE-{dataset_name}-neighbor", "*", "best.pth")
             ckpt_path2_list = glob.glob(ckpt_path2_pattern)
             if not ckpt_path2_list:
                 raise FileNotFoundError(f"Cannot find model2 checkpoint matching pattern: {ckpt_path2_pattern}")

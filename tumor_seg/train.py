@@ -7,7 +7,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from .networks.vit_seg_modeling import My_VisionTransformer as My_ViT_seg
-from .networks.vit_seg_modeling import My_VisionTransformer_v6554 as My_ViT_seg_v6554
+from .networks.vit_seg_modeling import TransUNet_ours as TransUNet_ours
 from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from .networks.medformer import MedFormer,MedFormer_ours
 from .networks.attention_unet import AttentionUNet,AttentionUNet_ours
@@ -171,7 +171,7 @@ if __name__ == "__main__":
         config_small.n_classes = args.num_classes
         config_small.n_skip = args.n_skip
         config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-        net = My_ViT_seg_v6554(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
+        net = TransUNet_ours(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
         print('Using TransUNet + TRACE')
     elif args.exp_name == 'medformer':
         print('Using medformer baseline model')

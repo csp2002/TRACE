@@ -2601,7 +2601,7 @@ class TRACE(nn.Module):   #
         return logits
 
 
-class MedSAM_v6554(nn.Module):
+class MedSAM_with_TRACE(nn.Module):
     def __init__(
         self,
         image_encoder,

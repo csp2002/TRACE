@@ -209,7 +209,7 @@ class MedSAM2_2D_Dataset(Dataset):
         if ref_mask_path is None or not os.path.exists(ref_mask_path):
             raise FileNotFoundError(f"Reference mask not found: {ref_mask_path}")
         
-        # 读取参考mask和图像（用于v6554实验）
+        # 读取参考mask和图像（for the TRACE variant）
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32) / 255.0
         ref_mask_resized = transform.resize(
             ref_mask, (self.image_size, self.image_size),
@@ -267,7 +267,7 @@ class MedSAM2_2D_Dataset(Dataset):
         img_pil = Image.fromarray(img_resized, mode='RGB')
         mask_pil = Image.fromarray((mask_resized * 255).astype(np.uint8), mode='L')
         
-        # 处理参考图像和mask（用于v6554）
+        # 处理参考图像和mask(for the TRACE variant)
         ref_img_pil = None
         ref_mask_pil = None
         if ref_image_resized is not None:
@@ -280,7 +280,7 @@ class MedSAM2_2D_Dataset(Dataset):
             if random.random() < 0.5:
                 img_pil = F.hflip(img_pil)
                 mask_pil = F.hflip(mask_pil)
-                # 对参考图像和mask也应用翻转（用于v6554）
+                # 对参考图像和mask也应用翻转(for the TRACE variant)
                 if ref_img_pil is not None:
                     ref_img_pil = F.hflip(ref_img_pil)
                 if ref_mask_pil is not None:
@@ -317,7 +317,7 @@ class MedSAM2_2D_Dataset(Dataset):
                     fill=0
                 )
                 
-                # 对参考图像和mask也应用相同的变换（用于v6554）
+                # 对参考图像和mask也应用相同的变换(for the TRACE variant)
                 if ref_img_pil is not None:
                     ref_img_pil = F.affine(
                         ref_img_pil,
@@ -374,7 +374,7 @@ class MedSAM2_2D_Dataset(Dataset):
             'img_name': img_name,
         }
         
-        # 添加参考图像和mask（用于v6554实验）
+        # 添加参考图像和mask（for the TRACE variant）
         if ref_img_pil is not None:
             ref_img_tensor = F.to_tensor(ref_img_pil)  # (3, H, W), float [0, 1]
             ref_img_tensor = F.normalize(ref_img_tensor, mean=mean, std=std)  # (3, H, W)
