@@ -40,14 +40,14 @@ from .networks.MISSFormer import MISSFormer
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
 # MedSAM imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../third_party/medsam'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam'))
 from segment_anything import sam_model_registry
 import vit_seg_configs as medsam_configs
 from My_utils import MedSAM_v6554, TRACE
 import torch.nn as nn
 
 # MedSAM2 imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../third_party/medsam2'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2'))
 from sam2.build_sam import build_sam2
 from training.model.medsam2_with_trace import MedSAM2_v6554
 from training.model.trace import TRACE as medsam2_TRACE
@@ -1199,7 +1199,7 @@ if __name__ == "__main__":
         
     elif args.model_name == "MedSAM":
         # MedSAM model loading
-        medsam_root = os.path.join(os.path.dirname(__file__), '../third_party/medsam')
+        medsam_root = os.path.join(os.path.dirname(__file__), '../foundation_models/medsam')
         medsam_base_ckpt = os.path.join(medsam_root, "medsam_vit_b.pth")
         
         # Load base SAM model
@@ -1268,7 +1268,7 @@ if __name__ == "__main__":
         
     elif args.model_name == "MedSAM2":
         # MedSAM2 model loading
-        medsam2_root = os.path.join(os.path.dirname(__file__), '../third_party/medsam2')
+        medsam2_root = os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2')
         import glob
         # Hydra expects config path relative to sam2 package, e.g., "configs/sam2.1_hiera_t512.yaml"
         # If user provides just filename, prepend "configs/"

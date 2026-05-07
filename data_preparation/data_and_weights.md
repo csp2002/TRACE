@@ -1,6 +1,6 @@
-# Data Preprocessing Guideline
+# Data and Pretrained Weights
 
-This repository does **not** redistribute any datasets. The TRACE evaluation uses 5 tumor CT datasets, four of which are publicly available; the in-house brain-tumor cohort is not redistributable. This document describes how to obtain each dataset and convert it into the 2D slice format expected by the training, testing and simulation code.
+This repository does **not** redistribute datasets or pretrained checkpoints. This document covers (a) how to obtain and convert each dataset, and (b) where to place each set of pretrained weights so the training, testing and simulation code can find them.
 
 ## 1. Datasets
 
@@ -19,7 +19,7 @@ After downloading, you should have one folder per dataset containing volumetric 
 
 The "Local" dataset used in our paper is a private brain-tumor MRI/CT cohort collected under an IRB-approved protocol. We are unable to redistribute it. Researchers wishing to reproduce the in-house results should obtain similar data through their own institutional channels.
 
-## 2. Pipeline overview
+## 2. Data preprocessing pipeline
 
 ```
 Raw NIfTI volumes
@@ -32,7 +32,7 @@ Raw NIfTI volumes
 Ready for training (tumor_seg/train.py) and simulation (tumor_seg/simulation.py)
 ```
 
-## 3. Step 1: NIfTI → 2D PNG slices
+### 2.1 Step 1: NIfTI → 2D PNG slices
 
 ```bash
 python -m data_preparation.nifti_to_2d \
@@ -41,11 +41,11 @@ python -m data_preparation.nifti_to_2d \
     --data  <dataset>
 ```
 
-**Per-dataset preprocessing details** (consult `data_preparation/nifti_to_2d.py` and `Dataset_statistic.py`-style helpers in the original paper):
+Per-dataset preprocessing details:
 
 - Re-orient volumes to a consistent axis order (depth, height, width).
 - Construct **binary** tumor masks by retaining only the dataset-specific tumor label and discarding organ labels.
-- Apply dataset-specific **intensity clipping** based on the 0.5th and 99.5th percentiles of foreground voxel intensities (see Table S1 of the paper for the per-dataset clip ranges).
+- Apply dataset-specific **intensity clipping** based on the 0.5th and 99.5th percentiles of foreground voxel intensities (per-dataset clip ranges are given in the supplement of the paper).
 - Apply min–max normalisation to map intensities into `[0, 1]`.
 - Extract 2D axial slices and retain only those that contain foreground tumor pixels.
 - Save each retained slice as a grayscale PNG together with its binary mask, organised by case.
@@ -63,7 +63,7 @@ The resulting layout is:
         └── Mask/<patient_id>/<slice_idx>.png
 ```
 
-## 4. Step 2: Reference slice annotations
+### 2.2 Step 2: Reference slice annotations
 
 The simulation framework needs to know which slice acts as the "reference" for each case. Two reference protocols are supported:
 
@@ -79,24 +79,47 @@ python -m data_preparation.extract_neighbor_slice \
 
 These produce JSON files (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`) consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
 
-## 5. Pretrained backbone weights
+## 3. ImageNet-pretrained backbone weights (for the 7 conventional models)
 
-The 7 CNN backbones rely on ImageNet-pretrained checkpoints:
+Required to initialise the 7 conventional model backbones at training time. Download each file and place it at the listed path **relative to the repository root**. All commands assume you run from the repo root.
 
-| Backbone | Checkpoint | Where to put it |
-|---|---|---|
-| TransUNet | `R50+ViT-B_16` (Google original) | `./tumor_seg/networks/<filename>.pth` (place yourself) |
-| SwinUNet | `swin_tiny_patch4_window7_224.pth` | `./tumor_seg/networks/swin_tiny_patch4_window7_224.pth` |
-| Other CNNs | ResNet-34 (`resnet34.pth`) | `./tumor_seg/networks/resnet34.pth` |
+| Backbone | File | Source | Place at |
+|---|---|---|---|
+| **TransUNet** | `R50+ViT-B_16.npz` | Google ViT release: `https://console.cloud.google.com/storage/vit_models/imagenet21k/` (download `R50+ViT-B_16.npz`) | `./model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz` |
+| **SwinUNet** | `swin_tiny_patch4_window7_224.pth` | Microsoft Swin Transformer: `https://github.com/microsoft/Swin-Transformer` → "Swin-T (ImageNet-1k pretrained)" | `./tumor_seg/networks/swin_tiny_patch4_window7_224.pth` |
+| **MedFormer / AttentionUNet / UNet++ / FATNet / H2Former** | `resnet34.pth` | torchvision: `https://download.pytorch.org/models/resnet34-b627a593.pth` (rename to `resnet34.pth` after download) | `./tumor_seg/networks/resnet34.pth` |
 
-These are **not** included in the repository. Download from the upstream repositories (TransUNet, Swin-UNet, torchvision) and place them under `tumor_seg/networks/`. The exact filenames the code expects can be found by grep'ing for `.pth` in `tumor_seg/networks/`.
+Quick command sketch:
 
-For **MedSAM** and **MedSAM2** vendored under `third_party/`, follow each vendor's own README (`third_party/medsam/README.md` and `third_party/medsam2/README.md`) to obtain the upstream pretrained weights.
+```bash
+mkdir -p ./model/vit_checkpoint/imagenet21k ./tumor_seg/networks
 
-## 6. Trained TRACE checkpoints
+# TransUNet ImageNet-21k init (manual download from Google Cloud Storage; needs a browser)
+# Place R50+ViT-B_16.npz under ./model/vit_checkpoint/imagenet21k/
 
-We do **not** redistribute the trained TRACE checkpoints (~7 backbones × 5 datasets × 2 variants). Recreate them by training each backbone according to `tumor_seg/train.py`'s CLI; expect O(150 epochs) per (model, dataset) on a single A6000-class GPU.
+# SwinUNet (manual download from Microsoft's release page)
+# Place swin_tiny_patch4_window7_224.pth under ./tumor_seg/networks/
 
-## 7. Patient exclusion
+# ResNet-34 (direct curl)
+curl -L -o ./tumor_seg/networks/resnet34.pth \
+    https://download.pytorch.org/models/resnet34-b627a593.pth
+```
+
+## 4. Foundation-model weights (for MedSAM and MedSAM2)
+
+| Backbone | File | Source | Place at |
+|---|---|---|---|
+| **MedSAM** | `medsam_vit_b.pth` | Wang Lab MedSAM: `https://github.com/bowang-lab/MedSAM` → "Pre-trained weights" | `./foundation_models/medsam/medsam_vit_b.pth` |
+| **MedSAM2** | `MedSAM2_latest.pt` | Wang Lab MedSAM2: `https://github.com/bowang-lab/MedSAM2` → "Checkpoints" | `./foundation_models/medsam2/checkpoints/MedSAM2_latest.pt` |
+
+For up-to-date download URLs, see the upstream README of each project.
+
+## 5. Trained TRACE checkpoints
+
+We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 5 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
+
+The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; refer to the dispatch logic inside `simulation.py` for the exact subdirectory naming convention (`TU_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
+
+## 6. Patient exclusion
 
 The original paper excludes one patient (an outlier in the in-house cohort) from all simulations. The `--exclude-patients` flag of `tumor_seg/simulation.py` and `tumor_seg/edit_workload.py` accepts a quoted string of comma-separated patient IDs to drop at runtime; the released defaults pass an empty string.

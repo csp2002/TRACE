@@ -434,7 +434,7 @@ paper.
 ### 8.1 Strong advantages — write these
 
 **(A) Architecture-agnostic plug-in**
-- Empirical: the module brings consistent gains on 7 traditional 2D CNN
+- Empirical: the module brings consistent gains on 7 conventional model
   backbones (H2Former, UNet++, AttentionUNet, TransUNet, SwinUNet, FATNet,
   MedFormer) **and** on MedSAM2 image-mode.
 - MedSAM2-video's memory-attention is fused into the SAM2 architecture and
@@ -482,7 +482,7 @@ paper.
 
 - "Our module beats MedSAM2-video on Dice." — false on these 5 datasets.
 - "More general / more flexible" without concrete evidence. — must be
-  cashed out as the 7-CNN-plus-image-mode coverage and the
+  cashed out as the 7-conventional-models-plus-image-mode coverage and the
   reference-switching experiments.
 - "Easier to train." — true but unconvincing to reviewers.
 
@@ -496,7 +496,7 @@ paper.
 > propagation's initial prompt frame, making reference switching expensive
 > in interactive workflows; and (iii) inference is strictly sequential
 > along the propagation order. Our module trades a modest amount of Dice
-> for (a) cross-architecture portability, demonstrated on 7 CNN backbones
+> for (a) cross-architecture portability, demonstrated on 7 conventional model backbones
 > and on MedSAM2 image-mode, (b) free choice of reference slice at
 > deployment time, and (c) cheap iterative correction in
 > clinician-in-the-loop scenarios — properties that align directly with

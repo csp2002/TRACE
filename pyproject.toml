@@ -29,4 +29,4 @@ Repository = "https://github.com/<org>/tumor-seg-trace"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["tumor_seg*", "data_preparation*"]
-exclude = ["third_party*", "scripts*", "docs*"]
+exclude = ["foundation_models*", "scripts*", "docs*"]

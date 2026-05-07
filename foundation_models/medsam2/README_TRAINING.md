@@ -70,7 +70,7 @@
 ### 基本用法
 
 ```bash
-cd <repo>/third_party/medsam2
+cd <repo>/foundation_models/medsam2
 python train_medsam2_2d.py \
     --data colon \
     --ref_type middle \
@@ -153,7 +153,7 @@ work_dir/
 ### 基本用法
 
 ```bash
-cd <repo>/third_party/medsam2
+cd <repo>/foundation_models/medsam2
 python test_medsam2_2d.py \
     --data colon \
     --ref_type middle \

@@ -1,46 +1,15 @@
-# TRACE: Reference-Conditioned Iterative Refinement for Tumor Segmentation
+# TRACE: Tumor contouring Refinement via Annotation-Conditioned Enhancement
 
-> Code for **TRACE**, a plug-and-play refinement module that conditions on a single annotated reference slice and iteratively refines 2D tumor segmentations. Evaluated on 9 segmentation backbones across 5 tumor CT datasets.
-
-## 1. What this repository provides
-
-- **Training, testing and simulation code** for 9 backbones × 2 variants (baseline / +TRACE)
-- **Slice-by-slice acceptance simulation** (`tumor_seg/simulation.py`) replicating the clinician–AI accept/reject workflow
-- **Edit-workload comparison** (`tumor_seg/edit_workload.py`) measuring expected manual editing effort
-
-What it does **not** include:
-- Datasets (preprocessing instructions in `docs/data_preprocessing.md`)
-- Trained checkpoints (train them via the scripts here, or contact the authors)
-- Manuscript / supplementary material
-- HCI study analysis code, surveys, or clinician annotations
-- Visualization scripts and result CSVs from the paper
-
-## 2. Models
-
-| Family | Backbones |
-|---|---|
-| **7 traditional 2D CNNs** | H2Former, UNet++, AttentionUNet, TransUNet, SwinUNet, FATNet, MedFormer |
-| **2 foundation models** | MedSAM, MedSAM2 |
-
-Each backbone has a baseline variant (no reference conditioning) and a `+TRACE` variant. The TRACE module is defined in three locations to match each family's input resolution and feature geometry:
-
-| Family | TRACE class | Input |
-|---|---|---|
-| 7 CNNs | `tumor_seg/networks/vit_seg_modeling.py` (`class TRACE`) | 224 × 224 |
-| MedSAM | `third_party/medsam/My_utils.py` (`class TRACE`) | 1024 × 1024 |
-| MedSAM2 | `third_party/medsam2/training/model/trace.py` (`class TRACE`) | 512 × 512 |
-
-The three implementations share the same conceptual design (dual ResNet-18 encoders + confidence-pyramid decoder + iterative refinement); only tensor dimensions differ.
-
-## 3. Repository layout
+## 1. Repository layout
 
 ```
 tumor-seg-trace/
 ├── data_preparation/
 │   ├── nifti_to_2d.py
 │   ├── extract_middle_slice.py
-│   └── extract_neighbor_slice.py
-├── tumor_seg/                       # 7-CNN code + simulation
+│   ├── extract_neighbor_slice.py
+│   └── data_and_weights.md          # dataset + checkpoint preparation guide
+├── tumor_seg/                       # 7 conventional models + simulation
 │   ├── networks/
 │   ├── datasets/
 │   ├── train.py
@@ -49,84 +18,49 @@ tumor-seg-trace/
 │   ├── simulation_other_metrics.py
 │   ├── edit_workload.py
 │   └── middle_finetune.py
-├── third_party/
+├── foundation_models/
 │   ├── medsam/                      # MedSAM (vendored) + TRACE training/inference
 │   └── medsam2/                     # MedSAM2 (vendored) + TRACE training/inference
-├── docs/
-│   └── data_preprocessing.md
-├── 3DSAM.yaml                       # Conda env for 7-CNN + simulation
+├── TRACE.yaml                       # Conda env for the 7 conventional models + simulation
 ├── medsam.yaml                      # Conda env for MedSAM/MedSAM2
 ├── pyproject.toml
 ├── requirements.txt
-├── LICENSE                          # Apache-2.0
-└── CITATION.cff
+└── LICENSE                          # Apache-2.0
 ```
 
-## 4. Installation
+## 2. Installation
 
 ```bash
 git clone <this-repo> tumor-seg-trace
 cd tumor-seg-trace
 
-# Environment for 7 CNN backbones + simulation framework
-conda env create -f 3DSAM.yaml
-conda activate 3DSAM
+# Environment for the 7 conventional models + simulation framework
+conda env create -f TRACE.yaml
+conda activate TRACE
 pip install -e .
-
-# (Optional) Environment for MedSAM / MedSAM2
-conda env create -f medsam.yaml
 ```
 
-## 5. Data and pretrained weights
+For the **MedSAM** and **MedSAM2** environments, please follow the installation instructions in their original GitHub repositories: [bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM) and [bowang-lab/MedSAM2](https://github.com/bowang-lab/MedSAM2).
 
-This repository does **not** redistribute datasets or trained checkpoints. You must obtain them separately.
+## 3. Data and pretrained weights
 
-### 5.1 Datasets
+This repository does **not** redistribute datasets or pretrained checkpoints. See [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for:
 
-See [`docs/data_preprocessing.md`](docs/data_preprocessing.md) for download links and the conversion pipeline producing the expected `2D_data/<dataset>/<split>/{CT,Mask}/<patient>/*.png` layout, plus the JSON reference-slice annotations (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`).
+- Download links for the four publicly available CT datasets (KiTS, LiTS, MSD-Pancreas, MSD-Colon) and notes on the in-house "Local" cohort.
+- The full preprocessing pipeline (NIfTI → 2D PNG slices → reference-slice annotations).
+- Where to place the ImageNet-pretrained backbone weights (TransUNet R50+ViT-B, SwinUNet, ResNet-34) and the MedSAM / MedSAM2 vendor weights.
+- Notes on trained TRACE checkpoint layout and patient exclusion.
 
-### 5.2 ImageNet-pretrained backbone weights (for the 7 CNNs)
+## 4. Quick start
 
-Required to initialise the 7 CNN backbones at training time. Download each file and place it at the listed path **relative to the repository root**. All commands below assume you run from the repo root.
+We evaluate TRACE on **9 segmentation backbones**, each in a baseline variant and a `+TRACE` variant:
 
-| Backbone | File | Source | Place at |
-|---|---|---|---|
-| **TransUNet** | `R50+ViT-B_16.npz` | Google ViT release: `https://console.cloud.google.com/storage/vit_models/imagenet21k/` (download `R50+ViT-B_16.npz`) | `./model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz` |
-| **SwinUNet** | `swin_tiny_patch4_window7_224.pth` | Microsoft Swin Transformer: `https://github.com/microsoft/Swin-Transformer` → "Swin-T (ImageNet-1k pretrained)" | `./tumor_seg/networks/swin_tiny_patch4_window7_224.pth` |
-| **MedFormer / AttentionUNet / UNet++ / FATNet / H2Former** | `resnet34.pth` | torchvision: `https://download.pytorch.org/models/resnet34-b627a593.pth` (rename to `resnet34.pth` after download) | `./tumor_seg/networks/resnet34.pth` |
+| Family | Backbones |
+|---|---|
+| 7 conventional models | H2Former, UNet++, AttentionUNet, TransUNet, SwinUNet, FATNet, MedFormer |
+| 2 foundation models | MedSAM, MedSAM2 |
 
-Quick command sketch:
-
-```bash
-mkdir -p ./model/vit_checkpoint/imagenet21k ./tumor_seg/networks
-
-# TransUNet ImageNet-21k init (manual download from Google Cloud Storage; needs a browser)
-# Place R50+ViT-B_16.npz under ./model/vit_checkpoint/imagenet21k/
-
-# SwinUNet (manual download from Microsoft's release page)
-# Place swin_tiny_patch4_window7_224.pth under ./tumor_seg/networks/
-
-# ResNet-34 (direct curl)
-curl -L -o ./tumor_seg/networks/resnet34.pth \
-    https://download.pytorch.org/models/resnet34-b627a593.pth
-```
-
-### 5.3 Foundation-model weights (for MedSAM and MedSAM2)
-
-| Backbone | File | Source | Place at |
-|---|---|---|---|
-| **MedSAM** | `medsam_vit_b.pth` | Wang Lab MedSAM: `https://github.com/bowang-lab/MedSAM` → "Pre-trained weights" (Google Drive link in upstream README) | `./third_party/medsam/medsam_vit_b.pth` |
-| **MedSAM2** | `MedSAM2_latest.pt` | Wang Lab MedSAM2: `https://github.com/bowang-lab/MedSAM2` → "Checkpoints" (HuggingFace Hub link in upstream README) | `./third_party/medsam2/checkpoints/MedSAM2_latest.pt` |
-
-Both vendored READMEs (`third_party/medsam/README.md`, `third_party/medsam2/README.md`) carry the upstream download instructions verbatim — defer to them if upstream URLs change.
-
-### 5.4 Trained TRACE checkpoints
-
-We do **not** redistribute the trained TRACE checkpoints (~7 backbones × 5 datasets × 2 variants for the CNN family alone). Recreate them by running `tumor_seg/train.py` per the Quick Start (§6.1); expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU. The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; see `MODEL_REGISTRY`-style subdirectory naming inside `simulation.py` (`TU_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
-
-## 6. Quick start
-
-### 6.1 Train
+### 4.1 Train
 
 ```bash
 # Baseline TransUNet on KiTS
@@ -136,9 +70,13 @@ python -m tumor_seg.train --exp_name transunet --dataset kits
 python -m tumor_seg.train --exp_name transunet_ours --dataset kits
 ```
 
-The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `fat_net`, `h2former` — each with an `_ours` counterpart).
+The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `fat_net`, `h2former` — each with an `_ours` counterpart). Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
 
-### 6.2 Simulation (rejection-rate sweep)
+### 4.2 Workflow simulation
+
+Two parallel components implement our slice-by-slice clinician–AI collaboration simulation. They share the same `--model_name` / `--dataset` flags and the same checkpoint layout.
+
+#### 4.2.1 Rejection-rate sweep
 
 ```bash
 python -m tumor_seg.simulation \
@@ -150,12 +88,14 @@ python -m tumor_seg.simulation \
 
 Iterate over the 5 datasets (`kits`, `lits`, `pancreas`, `colon`, `local`) and the 9 backbones (`TransUNet`, `MedFormer`, `AttentionUNet`, `UNetPlusPlus`, `SwinUnet`, `FAT_Net`, `H2Former`, `MedSAM`, `MedSAM2`) to reproduce all reported simulation results.
 
-Simulation options (`--option`):
+Reference-protocol options (`--option`):
 1. **Neighbor reference** — previous slice's prediction conditions current slice
 2. **Last GT reference** — last rejected slice's GT conditions current slice (centred)
 3. **Conditional neighbor** — use prediction if accepted, GT if rejected
 
-### 6.3 Edit workload comparison
+A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
+
+#### 4.2.2 Edit workload comparison
 
 ```bash
 python -m tumor_seg.edit_workload --model_name TransUNet
@@ -163,30 +103,10 @@ python -m tumor_seg.edit_workload --model_name TransUNet
 
 Compares Mode A (no AI) vs Mode B (AI-assisted) edit effort using FN-rate, FP-rate, Hausdorff-95 and Dice-difference metrics.
 
-### 6.4 Other accept/reject metrics
+## 5. Acknowledgements
 
-`tumor_seg/simulation_other_metrics.py` is a variant of `simulation.py` supporting Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice. It uses the same CLI as `simulation.py` plus a `--metric` flag.
+This repository builds on [TransUNet](https://github.com/Beckschen/TransUNet), [MedSAM](https://github.com/bowang-lab/MedSAM) and [MedSAM2](https://github.com/bowang-lab/MedSAM2). We thank their authors for releasing their code.
 
-## 7. Vendor code attribution
+## 6. License
 
-`third_party/medsam/` is derived from [Wang Lab's MedSAM](https://github.com/bowang-lab/MedSAM); `third_party/medsam2/` is derived from [Wang Lab's MedSAM2](https://github.com/bowang-lab/MedSAM2). We retain each vendor's `LICENSE` and `README.md` and add the `class TRACE` integration on top. Substantive modifications are concentrated in:
-
-- `third_party/medsam/My_utils.py` — adds `class TRACE` and `MedSAM_v6554` (= MedSAM + TRACE)
-- `third_party/medsam/train_one_gpu.py`, `test_ref_finetune.py` — TRACE-aware training/testing
-- `third_party/medsam2/training/model/trace.py` — TRACE for MedSAM2
-- `third_party/medsam2/training/model/medsam2_with_trace.py` — MedSAM2 + TRACE
-- `third_party/medsam2/train_medsam2_2d_with_trace.py`, `test_medsam2_2d_with_trace.py` — TRACE-aware training/testing
-
-## 8. Citation
-
-```bibtex
-@article{trace2026,
-  title  = {TBD},
-  author = {TBD},
-  year   = {2026},
-}
-```
-
-## 9. License
-
-This repository is released under the [Apache-2.0 License](LICENSE). Vendored components retain their original licenses (see `third_party/*/LICENSE`).
+This repository is released under the [Apache-2.0 License](LICENSE). Vendored components retain their original licenses (see `foundation_models/*/LICENSE`).
