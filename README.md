@@ -52,7 +52,6 @@ tumor-seg-trace/
 ├── third_party/
 │   ├── medsam/                      # MedSAM (vendored) + TRACE training/inference
 │   └── medsam2/                     # MedSAM2 (vendored) + TRACE training/inference
-├── scripts/                         # Bash launchers (run_simulation_*, run_edit_workload_*)
 ├── docs/
 │   └── data_preprocessing.md
 ├── 3DSAM.yaml                       # Conda env for 7-CNN + simulation
@@ -142,16 +141,14 @@ The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `tran
 ### 6.2 Simulation (rejection-rate sweep)
 
 ```bash
-# Run all dataset/option combinations for one backbone
-bash scripts/run_simulation_TransUNet.sh
-
-# Or invoke directly
 python -m tumor_seg.simulation \
     --model_name TransUNet \
     --dataset kits \
     --option 3 \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
+
+Iterate over the 5 datasets (`kits`, `lits`, `pancreas`, `colon`, `local`) and the 9 backbones (`TransUNet`, `MedFormer`, `AttentionUNet`, `UNetPlusPlus`, `SwinUnet`, `FAT_Net`, `H2Former`, `MedSAM`, `MedSAM2`) to reproduce all reported simulation results.
 
 Simulation options (`--option`):
 1. **Neighbor reference** — previous slice's prediction conditions current slice
@@ -161,8 +158,6 @@ Simulation options (`--option`):
 ### 6.3 Edit workload comparison
 
 ```bash
-bash scripts/run_edit_workload_TransUNet.sh
-# or:
 python -m tumor_seg.edit_workload --model_name TransUNet
 ```
 
@@ -170,7 +165,7 @@ Compares Mode A (no AI) vs Mode B (AI-assisted) edit effort using FN-rate, FP-ra
 
 ### 6.4 Other accept/reject metrics
 
-`tumor_seg/simulation_other_metrics.py` is a variant of `simulation.py` supporting Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice. It uses the same CLI; see `scripts/run_sim_v4_local_TransUNet_metrics.sh` for an example.
+`tumor_seg/simulation_other_metrics.py` is a variant of `simulation.py` supporting Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice. It uses the same CLI as `simulation.py` plus a `--metric` flag.
 
 ## 7. Vendor code attribution
 
