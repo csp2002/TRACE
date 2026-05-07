@@ -72,11 +72,25 @@ python -m tumor_seg.train --exp_name transunet_ours --dataset kits
 
 The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `fat_net`, `h2former` — each with an `_ours` counterpart). Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
 
-### 4.2 Workflow simulation
+Trained checkpoints are written to `./checkpoints/<exp_subdir>/...`; the test and simulation drivers below load from the same location.
+
+### 4.2 Test (per-slice Dice and IoU)
+
+```bash
+# Baseline TransUNet on KiTS test set
+python -m tumor_seg.test --exp_name TU --dataset kits
+
+# TransUNet + TRACE on KiTS test set
+python -m tumor_seg.test --exp_name v6.5.54 --dataset kits --test_ref neighbor
+```
+
+`tumor_seg/test.py` reports mean Dice and IoU over all test slices. Pass `--is_save` to additionally dump the predicted masks to `--test_save_dir`. The exact `--exp_name` strings and reference-protocol flags follow the same convention as `train.py`.
+
+### 4.3 Workflow simulation
 
 Two parallel components implement our slice-by-slice clinician–AI collaboration simulation. They share the same `--model_name` / `--dataset` flags and the same checkpoint layout.
 
-#### 4.2.1 Rejection-rate sweep
+#### 4.3.1 Rejection-rate sweep
 
 ```bash
 python -m tumor_seg.simulation \
@@ -91,7 +105,7 @@ Iterate over the 4 datasets (`kits`, `lits`, `pancreas`, `colon`) and the 9 back
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 
-#### 4.2.2 Edit workload comparison
+#### 4.3.2 Edit workload comparison
 
 ```bash
 python -m tumor_seg.edit_workload --model_name TransUNet

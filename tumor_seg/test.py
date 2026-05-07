@@ -434,7 +434,7 @@ if __name__ == "__main__":
         args.exp = args.exp_name + '_' + args.train_ref + '_' + ckpt_dataset + str(args.img_size)
     # args.exp = args.exp_name + '_' + dataset_name + str(args.img_size)
 
-    snapshot_path = "../model/{}/{}".format(args.exp, 'TU')
+    snapshot_path = "./checkpoints/{}/{}".format(args.exp, 'TU')
     snapshot_path = snapshot_path + '_pretrain' if args.is_pretrain else snapshot_path
     snapshot_path += '_' + args.vit_name
     snapshot_path = snapshot_path + '_skip' + str(args.n_skip)
