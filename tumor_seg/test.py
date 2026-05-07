@@ -41,12 +41,7 @@ def compute_metrics(pred, target, smooth=1e-6):
     return iou.item(), dice.item()
 
 def inference(args, model, test_save_path=None):
-    if not args.n_square:
-        db_test = args.Dataset(base_dir=args.root_path, mode='test')
-    else:
-        db_test = args.Dataset(base_dir=args.root_path, mode='test', k=0)
-        print('Using n_square dataset (n(n-1) pairs)')
-    
+    db_test = args.Dataset(base_dir=args.root_path, mode='test')
     testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
     print("Number of testing samples: ", len(testloader))
     logging.info("{} test iterations per epoch".format(len(testloader)))
@@ -60,40 +55,19 @@ def inference(args, model, test_save_path=None):
     th_85 = 0
     th_90 = 0
 
-    from collections import defaultdict
-    import matplotlib.pyplot as plt
-
-    distance_dice_dict = defaultdict(list)
-
     for i_batch, sampled_batch in tqdm(enumerate(testloader)):
-        # h, w = sampled_batch["image"].size()[2:]
-        if args.n_square:
-            image, label, ref_image, ref_mask, distance, image_path = sampled_batch["image"].unsqueeze(0).cuda(), sampled_batch["label"].cuda(), sampled_batch['ref_image'].unsqueeze(1).cuda(), sampled_batch['ref_mask'].unsqueeze(1).cuda(), sampled_batch['distance'].cuda(), sampled_batch['image_path']  #img:1,1,224,224 label:1,224,224
-        else:
-            image, label, ref_image, ref_mask, _, image_path = sampled_batch["image"].unsqueeze(0).cuda(), sampled_batch["label"].cuda(), sampled_batch['ref_image'].unsqueeze(1).cuda(), sampled_batch['ref_mask'].unsqueeze(1).cuda(), sampled_batch['case_name'], sampled_batch['image_path']
-        
-        # #print shape max min
-        # print('image:', image.shape, image.max(), image.min()) # (1,1,224,224)
-        # print('label:', label.shape, label.max(), label.min())   #(1,224,224)
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min()) #(1,1,224,224)
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())  # (1,1,224,224)
-        # print('distance:', distance.shape, type(distance), distance.max(), distance.min())
-        
-        if args.exp_name == 'transunet' or args.exp_name == 'medformer' or args.exp_name == 'attention_unet' or args.exp_name == 'unetpp' or args.exp_name == 'swin_unet' or args.exp_name == 'FAT_Net' or args.exp_name == 'H2Former':
-            outputs = model(image) # bs,class_num,224,224  #used in the original TransUNet
-        # elif not args.has_confidence:
-        #     outputs = model(image, ref_image, ref_mask)
-        elif args.exp_name == 'v2' or args.exp_name == 'v5' or args.exp_name == 'v6' or args.exp_name == 'v6.1' or args.exp_name == 'v6.2' or args.exp_name == 'v6.3' or 'v6.5' in args.exp_name or 'ours' in args.exp_name :
+        image, label, ref_image, ref_mask, _, image_path = (
+            sampled_batch["image"].unsqueeze(0).cuda(),
+            sampled_batch["label"].cuda(),
+            sampled_batch['ref_image'].unsqueeze(1).cuda(),
+            sampled_batch['ref_mask'].unsqueeze(1).cuda(),
+            sampled_batch['case_name'],
+            sampled_batch['image_path'],
+        )
+        if 'ours' in args.exp_name:
             outputs = model(image, ref_image, ref_mask)
-
-        elif args.exp_name == 'sli2vol_v3o1' or args.exp_name == 'vol2flow_v3o1':
-            outputs = model(image, ref_mask)
-        elif args.exp_name == 'sli2vol_v3o2' or args.exp_name == 'vol2flow_v3o2':
-            outputs, foreground_mask, modulation_map, ref_mask = model(image, ref_mask)
-        elif args.exp_name == 'sli2vol_v4' or args.exp_name == 'vol2flow_v4':
-                outputs,  ref_mask, flow = model(image, ref_mask)
         else:
-            outputs, refined_mask = model(image, ref_image, ref_mask)  #used when adding my two modules
+            outputs = model(image)
         # print('outputs:', outputs.shape, outputs.max(), outputs.min())   (1,2,224,224)
         # raise Exception
         if isinstance(outputs, dict):
@@ -134,11 +108,6 @@ def inference(args, model, test_save_path=None):
         if dice <= 0.9:
             th_90 += 1
 
-        # 记录 (distance, dice)
-        if args.n_square:
-            dist = int(distance[0])  # 假设 distance 是 batch size = 1 的 tensor
-            distance_dice_dict[dist].append(dice)
-
         #save the image slice by slice, do not use test_single_volume
         # print('image_path:', image_path)
         # print('test_save_path:', test_save_path)
@@ -173,142 +142,7 @@ def inference(args, model, test_save_path=None):
     logging.info('Testing performance in best val model: th_70 : %d th_75 : %d th_80 : %d th_85 : %d th_90 : %d' % (th_70, th_75, th_80, th_85, th_90))
     print("Testing Finished!")
 
-    # if args.n_square:
-    #     distance_list = sorted(distance_dice_dict.keys())
-    #     data = [distance_dice_dict[d] for d in distance_list]  # 每个 distance 的 dice 列表
-    #     labels = [str(d) for d in distance_list]
 
-    #     plt.figure(figsize=(12, 6))
-    #     plt.boxplot(data, labels=labels, showfliers=True)  # 显示离群值
-    #     plt.ylim(0, 1)
-    #     plt.xlabel("Distance to Reference Slice")
-    #     plt.ylabel("Dice Score")
-    #     plt.title("Dice Distribution per Distance")
-    #     plt.grid(True)
-    #     plt.tight_layout()
-
-    #     save_folder = os.path.join('./visualization', 'n(n-1)', args.exp_name)
-    #     if not os.path.exists(save_folder):
-    #         os.makedirs(save_folder)
-    #     plt.savefig(os.path.join(save_folder, f'{args.dataset}_boxplot.png'))  # 保存图像
-    #     plt.close()
-
-
-        
-    #     distance_list = sorted(distance_dice_dict.keys())
-    #     mean_dice_list = [np.mean(distance_dice_dict[d]) for d in distance_list]
-
-    #     # 可视化
-    #     plt.figure(figsize=(8, 5))
-    #     plt.plot(distance_list, mean_dice_list, marker='o')
-    #     plt.ylim(0, 1)
-    #     plt.xlabel("Distance to Reference Slice")
-    #     plt.ylabel("Dice Score")
-    #     plt.title("Dice vs. Reference Distance")
-    #     plt.grid(True)
-    #     plt.tight_layout()
-    #     save_folder = os.path.join('./visualization', 'n(n-1)',args.exp_name)
-    #     if not os.path.exists(save_folder):
-    #         os.makedirs(save_folder)
-    #     plt.savefig(os.path.join(save_folder, f'{args.dataset}.png'))  # 保存图像
-    #     plt.close()  # 关闭当前图像
-
-
-
-
-
-
-
-
-def inference_multiple_ref(args, model, test_save_path=None):   #used when multiple reference slices
-    if not args.n_square:
-        db_test = args.Dataset(base_dir=args.root_path, mode='test')
-    else:
-        db_test = args.Dataset(base_dir=args.root_path, mode='test', k=0)
-        print('Using n_square dataset (n(n-1) pairs)')
-    
-    testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-    logging.info("{} test iterations per epoch".format(len(testloader)))
-    model.eval()
-    # metric_list = 0.0
-    total_iou = 0.0
-    total_dice = 0.0
-    
-
-    for i_batch, sampled_batch in tqdm(enumerate(testloader)):
-        # h, w = sampled_batch["image"].size()[2:]
-        
-        image, label, ref_image1, ref_mask1, ref_image2, ref_mask2, distance1, distance2, case_name, image_path = sampled_batch["image"].unsqueeze(0).cuda(), sampled_batch["label"].cuda(), sampled_batch['ref_image1'].unsqueeze(1).cuda(), sampled_batch['ref_mask1'].unsqueeze(1).cuda(), sampled_batch['ref_image2'].unsqueeze(1).cuda(), sampled_batch['ref_mask2'].unsqueeze(1).cuda(),sampled_batch['distance1'].cuda(), sampled_batch['distance2'].cuda(), sampled_batch['case_name'], sampled_batch['image_path']  #img:1,1,224,224 label:1,224,224
-
-        
-        #print shape max min
-        # print('image:', image.shape, image.max(), image.min())
-        # print('label:', label.shape, label.max(), label.min())
-        # print('distance:', distance.shape, type(distance), distance.max(), distance.min())
-        if args.strategy == 'closest':
-            # 选择距离最近的参考图像和掩码
-            if distance1 <= distance2:
-                outputs = model(image, ref_image1, ref_mask1)
-            else:
-                outputs = model(image, ref_image2, ref_mask2)
-        elif args.strategy == 'average':
-            outputs1 = model(image, ref_image1, ref_mask1)
-            outputs2 = model(image, ref_image2, ref_mask2)
-            outputs = (outputs1 + outputs2) / 2
-        elif args.strategy == 'weighted':
-            outputs1 = model(image, ref_image1, ref_mask1)
-            outputs2 = model(image, ref_image2, ref_mask2)
-            outputs = distance2 / (distance1 + distance2) * outputs1 + distance1 / (distance1 + distance2) * outputs2
-        
-        # print('outputs:', outputs.shape, outputs.max(), outputs.min())
-        out = torch.argmax(torch.softmax(outputs, dim=1), dim=1)
-        # out = out.cpu().detach().numpy()
-
-        # Resize prediction and label back to original resolution before computing metrics
-        orig_img = Image.open(image_path[0]).convert("L")
-        orig_h, orig_w = orig_img.size[1], orig_img.size[0]  # PIL: (W, H)
-        cur_h, cur_w = out.shape[-2], out.shape[-1]
-        if orig_h != cur_h or orig_w != cur_w:
-            from scipy.ndimage import zoom as scipy_zoom
-            out_np = out.squeeze().cpu().numpy().astype(np.float32)
-            label_np = label.squeeze().cpu().numpy().astype(np.float32)
-            out_np = scipy_zoom(out_np, (orig_h / cur_h, orig_w / cur_w), order=0)
-            label_np = scipy_zoom(label_np, (orig_h / cur_h, orig_w / cur_w), order=0)
-            out_t = torch.from_numpy((out_np > 0.5).astype(np.float32))
-            label_t = torch.from_numpy((label_np > 0.5).astype(np.float32))
-            iou, dice = compute_metrics(out_t, label_t)
-        else:
-            iou, dice = compute_metrics(out, label)
-        # print(f"iou: {iou}, dice: {dice}")
-        total_iou += iou
-        total_dice += dice
-
-        #save the image slice by slice, do not use test_single_volume
-        # print('image_path:', image_path)
-        # print('test_save_path:', test_save_path)
-        
-        # print('folder:', folder)
-        # raise Exception
-        if test_save_path is not None:
-            save_folder = os.path.join(test_save_path, image_path[0].split('/')[-2])
-            os.makedirs(save_folder, exist_ok=True)
-            save_path = os.path.join(save_folder, image_path[0].split('/')[-1])
-            prediction = (out.squeeze().cpu().numpy() * 255).astype(np.uint8)
-            Image.fromarray(prediction).save(save_path)
-            # print('save_path:', save_path)
-            
-            
-
-
-
-      
-    avg_iou = total_iou / len(db_test)
-    avg_dice = total_dice / len(db_test)
-    
-    logging.info('Testing performance in best val model: mean_dice : %f mean_iou : %f' % (avg_dice, avg_iou))
-    print("Testing Finished!")
-
-    
 
 
 
@@ -341,9 +175,7 @@ if __name__ == "__main__":
     parser.add_argument('--test_ref', type=str, default='middle', help='choose the reference slice')
     parser.add_argument('--train_dataset', type=str, default=None, help='training dataset name for OOD testing (overrides --dataset in checkpoint path)')
     parser.add_argument('--has_confidence', action="store_true", help='whether to use confidence map in refinement module')
-    parser.add_argument('--n_square', action="store_true", help='whether to average the metrics for n(n-1) pairs during inference')
     parser.add_argument('--deep_supervision', action='store_true', help='whether to use deep supervision')
-    parser.add_argument('--strategy',type=str, default=None, choices=['average', 'weighted', 'closest','middle'], help='strategy when multiple reference')
     args = parser.parse_args()
     
     if not args.deterministic:
@@ -392,36 +224,18 @@ if __name__ == "__main__":
     args.root_path = dataset_config[dataset_name]['root_path']
     # args.volume_path = dataset_config[dataset_name]['volume_path']
     # args.Dataset = dataset_config[dataset_name]['Dataset']
-    if args.exp_name == 'sli2vol':
-        args.Dataset = Dataset_sli2vol
-    elif args.exp_name == 'vol2flow':
-        args.Dataset = Dataset_vol2flow
-    elif args.test_ref == 'largest':
-        args.Dataset = Dataset_v5
-        print('Using v5 dataset (largest as reference)')
-    elif args.test_ref == 'middle':
+    if args.test_ref == 'middle':
         args.Dataset = Dataset_v5_2
-        print('Using v5_2 dataset (middle as reference)')
+        print('Using middle-slice reference dataset')
     elif args.test_ref == 'neighbor':
         args.Dataset = Dataset_v6_5
-        print('Using v6.5 dataset (neighbor as reference)')
+        print('Using neighbor-slice reference dataset')
     else:
         args.Dataset = Synapse_dataset
+        print('Using baseline (no-reference) dataset')
     # args.list_dir = dataset_config[dataset_name]['list_dir']
     # args.z_spacing = dataset_config[dataset_name]['z_spacing']
     
-    if args.n_square:
-        if args.strategy is not None:
-            args.Dataset = Dataset_v6_4
-            print('Using dataset_v6_4')
-        else:
-            args.Dataset = Dataset_v6_2
-    else:
-        
-        if args.strategy is not None:
-            args.Dataset = Dataset_v6_3
-            print('Using dataset_v6_3')
-
     print(args)
     args.is_pretrain = True
     # name the same snapshot defined in train script!
@@ -572,10 +386,6 @@ if __name__ == "__main__":
         os.makedirs(test_save_path, exist_ok=True)
     else:
         test_save_path = None
-    if args.strategy is not None:
-        print('Using multiple reference slices!')
-        inference_multiple_ref(args, net, test_save_path)
-    else:
-        inference(args, net, test_save_path)
+    inference(args, net, test_save_path)
 
 

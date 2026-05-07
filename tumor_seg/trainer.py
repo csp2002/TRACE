@@ -19,7 +19,7 @@ from torchvision import transforms
 
 def trainer_synapse(args, model, snapshot_path):
     from .datasets.dataset_synapse import Synapse_dataset, RandomGenerator, RandomGenerator_ref
-    from .datasets.dataset_synapse import Dataset_sli2vol, Dataset_vol2flow, Dataset_v5, Dataset_v5_2, Dataset_v6, Dataset_v6_2, Dataset_v6_5
+    from .datasets.dataset_synapse import Dataset_v5_2, Dataset_v6_5
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -28,51 +28,22 @@ def trainer_synapse(args, model, snapshot_path):
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
-    if 'sli2vol' in args.exp_name:
-        db_train = Dataset_sli2vol(base_dir=args.root_path, 
-                                   transform=transforms.Compose(
-                                       [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print("The length of train set is: {}".format(len(db_train)))
-    elif 'vol2flow' in args.exp_name:
-        db_train = Dataset_vol2flow(base_dir=args.root_path, 
-                                    transform=transforms.Compose(
-                                        [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print("The length of train set is: {}".format(len(db_train)))
-    elif args.ref == 'largest':
-        db_train = Dataset_v5(base_dir=args.root_path, 
-                              transform=transforms.Compose(
-                                  [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print('Using v5 dataset (largest as reference)')
-        print("The length of train set is: {}".format(len(db_train)))
-    elif args.ref == 'middle':
-        db_train = Dataset_v5_2(base_dir=args.root_path, 
-                              transform=transforms.Compose(
-                                  [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print('Using v5_2 dataset (middle as reference)')
-        print("The length of train set is: {}".format(len(db_train)))
-    elif args.ref == 'random':
-        db_train = Dataset_v6(base_dir=args.root_path, 
-                              transform=transforms.Compose(
-                                  [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print('Using v6 dataset (random as reference)')
-        print("The length of train set is: {}".format(len(db_train)))
-    elif 'v6.3' in args.exp_name:
-        db_train = Dataset_v6_2(base_dir=args.root_path, 
+    if args.ref == 'middle':
+        db_train = Dataset_v5_2(base_dir=args.root_path,
                                 transform=transforms.Compose(
-                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print('Using v6 dataset (random 5, fixed)')
-        print("The length of train set is: {}".format(len(db_train)))
+                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
+        print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
-        db_train = Dataset_v6_5(base_dir=args.root_path, 
+        db_train = Dataset_v6_5(base_dir=args.root_path,
                                 transform=transforms.Compose(
-                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print('Using v6_5 dataset (neighbor as reference)')
-        print("The length of train set is: {}".format(len(db_train)))
+                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
+        print('Using neighbor-slice reference dataset')
     else:
-        db_train = Synapse_dataset(base_dir=args.root_path, 
-                                transform=transforms.Compose(
-                                    [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode = 'train')
-        print("The length of train set is: {}".format(len(db_train)))
+        db_train = Synapse_dataset(base_dir=args.root_path,
+                                   transform=transforms.Compose(
+                                       [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode='train')
+        print('Using baseline (no-reference) dataset')
+    print("The length of train set is: {}".format(len(db_train)))
 
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
@@ -107,20 +78,10 @@ def trainer_synapse(args, model, snapshot_path):
             # print('label:', label_batch.shape, label_batch.max(), label_batch.min())
             # raise Exception
             
-            if args.exp_name == 'transunet' or args.exp_name == 'medformer' or args.exp_name == 'attention_unet' or args.exp_name == 'unetpp' or args.exp_name == 'swin_unet' or args.exp_name == 'FAT_Net' or args.exp_name == 'H2Former' or args.exp_name == 'MISSFormer':
-                outputs = model(image_batch)  #used in the original 2D baseline models
-            # elif not args.has_confidence:
-            #     outputs = model(image_batch, ref_image_batch, ref_mask_batch)  # bs,class_num,224,224, used when adding my two modules
-            elif args.exp_name == 'v2' or args.exp_name == 'v5' or args.exp_name == 'v6' or args.exp_name == 'v6.1' or args.exp_name == 'v6.2' or args.exp_name == 'v6.3' or 'v6.5' in args.exp_name or 'ours' in args.exp_name:
+            if 'ours' in args.exp_name:
                 outputs = model(image_batch, ref_image_batch, ref_mask_batch)
-            elif args.exp_name == 'sli2vol_v3o1' or args.exp_name == 'vol2flow_v3o1':
-                outputs = model(image_batch, ref_mask_batch)
-            elif args.exp_name == 'sli2vol_v3o2' or args.exp_name == 'vol2flow_v3o2':
-                outputs, foreground_mask, modulation_map, ref_mask = model(image_batch, ref_mask_batch)
-            elif args.exp_name == 'sli2vol_v4' or args.exp_name == 'vol2flow_v4':
-                outputs,  ref_mask, flow = model(image_batch, ref_mask_batch)
             else:
-                outputs, refined_mask = model(image_batch, ref_image_batch, ref_mask_batch)  # bs,class_num,224,224, used when adding my two modules
+                outputs = model(image_batch)
             # print('outputs:', outputs.shape, outputs.max(), outputs.min())
             # raise Exception
             

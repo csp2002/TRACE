@@ -149,22 +149,7 @@ def main():
     # print(type(sam_model))
     # sam_model = sam_model_registry[args.model_type]
     # print('task_name:', args.task_name)
-    if  'vol2flow_v3o1' in args.task_name:
-        medsam_model = MedSAM_v3o1(
-            image_encoder=sam_model.image_encoder,
-            mask_decoder=sam_model.mask_decoder,
-            prompt_encoder=sam_model.prompt_encoder,
-            refinement = refinement_v3(),
-        )
-        print('Using vol2flow_v3o1')
-    elif  'vol2flow_v3o2' in args.task_name:
-        medsam_model = MedSAM_v3o2(
-            image_encoder=sam_model.image_encoder,
-            mask_decoder=sam_model.mask_decoder,
-            prompt_encoder=sam_model.prompt_encoder,
-            refinement = refinement_v4(),
-        )
-    elif 'v6' in args.task_name:
+    if 'with_trace' in args.task_name:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
         config_small.n_skip = 3
@@ -173,9 +158,9 @@ def main():
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
-            refinement = TRACE(config_small),
+            refinement=TRACE(config_small),
         )
-        print('Using MedSAM_with_TRACE with TRACE')
+        print('Using MedSAM + TRACE')
     else:
         medsam_model = MedSAM(
             image_encoder=sam_model.image_encoder,
@@ -183,6 +168,7 @@ def main():
             prompt_encoder=sam_model.prompt_encoder,
             refinement=refinement(),
         )
+        print('Using baseline MedSAM')
 
     
     ckpt = torch.load(args.ckpt_path, map_location=device)
@@ -228,26 +214,16 @@ def main():
         },
     }
     root_path = dataset_config[args.data]['root_path']
-    if 'vol2flow' in args.task_name:
-        test_dataset = Dataset_vol2flow(
-            base_dir=root_path,
-            mode='test'
-        )
-    elif 'sli2vol' in args.task_name:
-        test_dataset = Dataset_sli2vol(
-            base_dir=root_path,
-            mode='test'
-        )
-    elif args.ref == 'middle':
+    if args.ref == 'middle':
         test_dataset = Dataset_v6_2(base_dir=root_path, mode='test')
-        print('Using v6_2 dataset (middle slice as reference)')
-    elif args.ref == 'largest':
-        test_dataset = Dataset_v6(base_dir=root_path, mode='test')
-        print('Using v6 dataset,largest')
+        print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
         test_dataset = Dataset_v9(base_dir=root_path, mode='test')
-        print('Using v9 dataset (neighbor as reference)')
-    # train_dataset = NpyDataset(args.tr_npy_path)
+        print('Using neighbor-slice reference dataset')
+    else:
+        raise ValueError(
+            f"Unsupported --ref value: {args.ref!r}; expected 'middle' or 'neighbor'"
+        )
 
     print("Number of testing samples: ", len(test_dataset))
     test_dataloader = DataLoader(
@@ -268,18 +244,11 @@ def main():
         
         boxes_np = boxes.detach().cpu().numpy()
         image, gt2D, ref_img, ref_gt = image.to(device), gt2D.to(device), ref_img.to(device), ref_gt.to(device)
-        if 'vol2flow_v3o1' in args.task_name:
-            medsam_pred, ori_res_masks = medsam_model(image, boxes_np, ref_gt)
-        elif 'vol2flow_v3o2' in args.task_name:
-            medsam_pred, ori_res_masks, modulation_map, foreground_mask = medsam_model(image, boxes_np, ref_gt)
-        elif 'with_trace' in args.task_name:
-                    # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
-                    # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
+        if 'with_trace' in args.task_name:
             outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
             medsam_pred = outputs['final']
-        # elif 'v6' in args.task_name:
-        #     medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
-        # medsam_pred,_ = medsam_model(image, boxes_np, ref_mask)  #1,1,1024,1024
+        else:
+            medsam_pred = medsam_model(image, boxes_np)
         medsam_pred = torch.sigmoid(medsam_pred)
         final_pred = medsam_pred > 0.5
         iou, dice = compute_metrics(

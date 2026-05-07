@@ -171,21 +171,7 @@ def main():
     sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
     # print(type(sam_model))
     # sam_model = sam_model_registry[args.model_type]
-    if  'vol2flow_v3o1' in args.task_name:
-        medsam_model = MedSAM_v3o1(
-            image_encoder=sam_model.image_encoder,
-            mask_decoder=sam_model.mask_decoder,
-            prompt_encoder=sam_model.prompt_encoder,
-            refinement = refinement_v3(),
-        )
-    elif  'vol2flow_v3o2' in args.task_name:
-        medsam_model = MedSAM_v3o2(
-            image_encoder=sam_model.image_encoder,
-            mask_decoder=sam_model.mask_decoder,
-            prompt_encoder=sam_model.prompt_encoder,
-            refinement = refinement_v4(),
-        )
-    elif 'with_trace' in args.task_name:
+    if 'with_trace' in args.task_name:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
         config_small.n_skip = 3
@@ -194,9 +180,9 @@ def main():
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
-            refinement = TRACE(config_small),
+            refinement=TRACE(config_small),
         )
-        print('Using MedSAM_with_TRACE with TRACE')
+        print('Using MedSAM + TRACE')
     else:
         medsam_model = MedSAM(
             image_encoder=sam_model.image_encoder,
@@ -204,6 +190,7 @@ def main():
             prompt_encoder=sam_model.prompt_encoder,
             refinement=refinement(),
         )
+        print('Using baseline MedSAM')
 
     
     medsam_model.load_state_dict(
@@ -283,42 +270,22 @@ def main():
         },
     }
     root_path = dataset_config[args.data]['root_path']
-    if 'vol2flow' in args.task_name:
-        train_dataset = Dataset_vol2flow(
-            base_dir=root_path,
-            mode='train'
-        )
-    elif 'sli2vol' in args.task_name:
-        train_dataset = Dataset_sli2vol(
-            base_dir=root_path,
-            mode='train'
-        )
-    elif  args.ref == 'largest':
-        train_dataset = Dataset_v6(
-            base_dir=root_path,
-            mode='train'
-        )
-        print('Using v6 dataset (largest)')
-   
-    elif 'v6.4' in args.task_name:
-        train_dataset = Dataset_v8(
-            base_dir=root_path,
-            mode='train'
-        )
-        print('Using v8 dataset (random,box from vol2flow)')
-    elif args.ref == 'neighbor':
+    if args.ref == 'neighbor':
         train_dataset = Dataset_v9(
             base_dir=root_path,
             mode='train'
         )
-        print('Using v9 dataset (neighbor as reference)')
+        print('Using neighbor-slice reference dataset')
     elif args.ref == 'middle':
         train_dataset = Dataset_v6_2(
             base_dir=root_path,
             mode='train'
         )
-        print('Using v6_2 dataset (middle slice as reference)')
-    # train_dataset = NpyDataset(args.tr_npy_path)
+        print('Using middle-slice reference dataset')
+    else:
+        raise ValueError(
+            f"Unsupported --ref value: {args.ref!r}; expected 'middle' or 'neighbor'"
+        )
 
     print("Number of training samples: ", len(train_dataset))
     train_dataloader = DataLoader(
@@ -367,22 +334,7 @@ def main():
                 
                 # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                 # raise Exception
-                if 'vol2flow_v3o1' in args.task_name:
-                    medsam_pred, ori_mask = medsam_model(image, boxes_np, ref_gt)
-                    loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float()) + seg_loss(ori_mask, gt2D) + ce_loss(ori_mask, gt2D.float())
-                elif 'vol2flow_v3o2' in args.task_name:
-                    medsam_pred, ori_mask, modulation_map, ref_mask = medsam_model(image, boxes_np, ref_gt)
-                    
-                    #检验modulation_map和foreground_mask数值范围是否在0-1之间
-                    if modulation_map.max() <= 1 and modulation_map.min() >= 0 and ref_mask.max() <= 1 and ref_mask.min() >= 0:
-                        loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float()) + 0.2 * F.binary_cross_entropy(modulation_map, ref_mask)
-                    else:
-                        print('modulation_map:', modulation_map.shape, modulation_map.max(), modulation_map.min())
-                        # raise Exception
-                        # print('foreground_mask:', ref_mask.shape, foreground_mask.max(), foreground_mask.min())
-                        loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
-                        # print('modulation_map or foreground_mask out of range in '+ img_name[0] + 'or '+ img_name[1])
-                elif 'with_trace' in args.task_name:
+                if 'with_trace' in args.task_name:
                     # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
                     # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                     outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
@@ -396,7 +348,8 @@ def main():
                     loss = loss_seg + loss_ce
                     # print("loss:", loss.item())
                 else:
-                    loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float()) 
+                    medsam_pred = medsam_model(image, boxes_np)
+                    loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
