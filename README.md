@@ -88,7 +88,7 @@ python -m tumor_seg.simulation \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
 
-For each slice in the test volume the AI's prediction is compared against the clinician's ground truth at the chosen Dice threshold; if the metric falls below the threshold the slice is "rejected" and the clinician's mask is used as the reference for the next slice, otherwise the AI prediction itself is the reference. The driver sweeps the threshold list, computes the rejection rate for both Mode A (no reference) and Mode B (TRACE-conditioned), and writes a JSON curve.
+For each slice in the test volume the AI's prediction is compared against the clinician's ground truth at the chosen Dice threshold; if the metric falls below the threshold the slice is "rejected" and the clinician corrects it, otherwise it is "accepted" as-is. The driver sweeps the threshold list and computes the rejection rate under two AI modes — Mode A is the baseline model alone (no reference), Mode B is the same baseline plus TRACE conditioned per slice on the previous slice's mask (the AI prediction if that slice was accepted, otherwise the clinician's correction) — and writes a JSON curve. Both modes use AI; the comparison isolates the effect of TRACE.
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 
@@ -98,7 +98,7 @@ A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface 
 python -m tumor_seg.edit_workload --model_name TransUNet
 ```
 
-Compares Mode A (no AI) vs Mode B (AI-assisted) edit effort using FN-rate, FP-rate, Hausdorff-95 and Dice-difference metrics.
+Compares per-slice edit effort between two AI modes: Mode A uses the baseline model only, Mode B uses the same baseline plus TRACE conditioned on the neighbor reference. Reports FN-rate, FP-rate, Hausdorff-95 and Dice-difference between the AI prediction and the clinician's ground truth, so the gap measures the editing the clinician would do. Both modes use AI; the comparison isolates the effect of TRACE.
 
 ## 5. Acknowledgements
 
