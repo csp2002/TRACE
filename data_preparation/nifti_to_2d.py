@@ -107,7 +107,7 @@ def data_extraction(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon",'local']
+        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
     parser.add_argument(
         "--data_prefix",   #folder to save checkpoints
@@ -145,42 +145,46 @@ if __name__ == '__main__':
         type=int,
     )
     args = parser.parse_args()
-    args.save_folder = os.path.join('./2D_data', args.data)
-    # os.makedirs(args.save_folder, exist_ok=True)
+    # Default save folder if user didn't pass one explicitly.
+    if not args.save_folder:
+        args.save_folder = os.path.join('./2D_data', args.data)
+    # Per-dataset preprocessing parameters: intensity clip range, foreground
+    # mean/std, axis order, target class id, and the canonical raw-data
+    # subdirectory name. Intensity stats are the 0.5 / 99.5 percentiles of
+    # foreground voxels reported in the paper supplement and are baked in so
+    # the user does not need to recompute them. The data_prefix default is
+    # only used when the user does not pass --data_prefix on the CLI.
     if args.data == 'kits':
-        args.intensity_range = (-52,269)
+        args.intensity_range = (-52, 269)
         args.global_mean = 60.514008
         args.global_std = 55.836348
-        args.spatial_index = [0,1,2]
+        args.spatial_index = [0, 1, 2]
         args.target_class = 2
-        args.data_prefix = 'kits23'
+        if not args.data_prefix:
+            args.data_prefix = 'kits23'
     elif args.data == 'pancreas':
         args.intensity_range = (-42, 195)
         args.global_mean = 71.919696
         args.global_std = 57.146912
-        args.spatial_index = [2, 1, 0]  # index used to convert to DHW
+        args.spatial_index = [2, 1, 0]
         args.target_class = 2
-        args.data_prefix = '3DSAM-adapter/Task03_Pancreas'
+        if not args.data_prefix:
+            args.data_prefix = 'Task03_Pancreas'
     elif args.data == 'lits':
         args.intensity_range = (-46, 164)
         args.global_mean = 60.456020
         args.global_std = 40.840413
-        args.spatial_index = [2, 1, 0]  # index used to convert to DHW
+        args.spatial_index = [2, 1, 0]
         args.target_class = 2
-        args.data_prefix = '3DSAM-adapter/baselines/LiTS/Task01_LITS17'
+        if not args.data_prefix:
+            args.data_prefix = 'Task01_LITS17'
     elif args.data == 'colon':
         args.intensity_range = (-30, 166)
         args.global_mean = 64.836747
         args.global_std = 32.622727
-        args.spatial_index = [2, 1, 0]  # index used to convert to DHW
+        args.spatial_index = [2, 1, 0]
         args.target_class = 1
-        args.data_prefix = '3DSAM-adapter/Task10_Colon'
-    elif args.data == 'local':
-        args.intensity_range = (45, 6912)
-        args.global_mean = 972.906849
-        args.global_std = 1152.660331
-        args.spatial_index = [2, 1, 0]  # index used to convert to DHW
-        args.target_class = 1
-        args.data_prefix = 'local_with_names_3DSAM'
+        if not args.data_prefix:
+            args.data_prefix = 'Task10_Colon'
     data_extraction(args)
 

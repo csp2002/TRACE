@@ -30,16 +30,16 @@ Ready for training (tumor_seg/train.py) and simulation (tumor_seg/simulation.py)
 
 ```bash
 python -m data_preparation.nifti_to_2d \
-    --src   /path/to/raw/<dataset>/ \
-    --dst   ./2D_data/<dataset>/ \
-    --data  <dataset>
+    --data        <dataset>                 # one of: kits, lits, pancreas, colon
+    --data_prefix /path/to/raw/<dataset>/   # raw NIfTI root for that dataset
+    --save_folder ./2D_data/<dataset>/      # optional; defaults to ./2D_data/<dataset>
 ```
 
-Per-dataset preprocessing details:
+Per-dataset preprocessing details (all baked into `nifti_to_2d.py`):
 
 - Re-orient volumes to a consistent axis order (depth, height, width).
 - Construct **binary** tumor masks by retaining only the dataset-specific tumor label and discarding organ labels.
-- Apply dataset-specific **intensity clipping** based on the 0.5th and 99.5th percentiles of foreground voxel intensities (per-dataset clip ranges are given in the supplement of the paper).
+- Apply dataset-specific **intensity clipping** to the 0.5th / 99.5th percentiles of foreground voxel intensities. The percentile ranges, foreground mean/std, axis order and target class id are pre-computed and hard-coded per dataset inside `nifti_to_2d.py`, so you do **not** need to recompute statistics; any tool you used to derive them is no longer needed at conversion time.
 - Apply min–max normalisation to map intensities into `[0, 1]`.
 - Extract 2D axial slices and retain only those that contain foreground tumor pixels.
 - Save each retained slice as a grayscale PNG together with its binary mask, organised by case.
@@ -112,4 +112,4 @@ For up-to-date download URLs, see the upstream README of each project.
 
 We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 4 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
 
-The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; refer to the dispatch logic inside `simulation.py` for the exact subdirectory naming convention (`TU_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
+The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; refer to the dispatch logic inside `simulation.py` for the exact subdirectory naming convention (`transunet_{dataset}224`, `transunet_ours_neighbor_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
