@@ -9,7 +9,7 @@ TRACE/
 │   ├── extract_middle_slice.py
 │   ├── extract_neighbor_slice.py
 │   └── data_and_weights.md          # dataset + checkpoint preparation guide
-├── tumor_seg/                       # 7 conventional models + simulation
+├── tumor_seg/                       # 7 conventional models 
 │   ├── networks/
 │   ├── datasets/
 │   ├── train.py
@@ -18,9 +18,9 @@ TRACE/
 │   ├── simulation_other_metrics.py
 │   └── edit_workload.py
 ├── foundation_models/
-│   ├── medsam/                      # MedSAM (vendored) + TRACE training/inference
-│   └── medsam2/                     # MedSAM2 (vendored) + TRACE training/inference
-├── TRACE.yaml                       # Conda env for the 7 conventional models + simulation
+│   ├── medsam/                      # MedSAM + TRACE training/inference
+│   └── medsam2/                     # MedSAM2 + TRACE training/inference
+├── TRACE.yaml                       # Conda env for the 7 conventional models 
 ├── medsam.yaml                      # Conda env for MedSAM/MedSAM2
 └── LICENSE                          # Apache-2.0
 ```
@@ -38,16 +38,11 @@ For the **MedSAM** and **MedSAM2** environments, please follow the installation 
 
 ## 3. Data and pretrained weights
 
-See [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for:
-
-- Download links for the four publicly available CT datasets (KiTS, LiTS, MSD-Pancreas, MSD-Colon).
-- The full preprocessing pipeline (NIfTI → 2D PNG slices → reference-slice annotations).
-- Where to place the MedSAM / MedSAM2 vendor weights. (ImageNet-pretrained backbone weights for the 7 conventional models are downloaded automatically on first run by `tumor_seg/train.py`.)
-- Notes on trained TRACE checkpoint layout and patient exclusion.
+Please see [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for details.
 
 ## 4. Quick start
 
-We evaluate TRACE on **9 segmentation backbones**, each in a baseline variant and a `+TRACE` variant:
+We evaluate TRACE on diverse segmentation backbones, each in a baseline variant and a `+TRACE` variant:
 
 | Family | Backbones |
 |---|---|
@@ -94,8 +89,6 @@ python -m tumor_seg.simulation \
 ```
 
 For each slice in the test volume the AI's prediction is compared against the clinician's ground truth at the chosen Dice threshold; if the metric falls below the threshold the slice is "rejected" and the clinician's mask is used as the reference for the next slice, otherwise the AI prediction itself is the reference. The driver sweeps the threshold list, computes the rejection rate for both Mode A (no reference) and Mode B (TRACE-conditioned), and writes a JSON curve.
-
-Iterate over the 4 datasets (`kits`, `lits`, `pancreas`, `colon`) and the 9 backbones (`TransUNet`, `MedFormer`, `AttentionUNet`, `UNetPlusPlus`, `SwinUnet`, `FAT_Net`, `H2Former`, `MedSAM`, `MedSAM2`) to reproduce all reported simulation results.
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 
