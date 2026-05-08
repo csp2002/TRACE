@@ -23,7 +23,6 @@ TRACE/
 │   └── medsam2/                     # MedSAM2 (vendored) + TRACE training/inference
 ├── TRACE.yaml                       # Conda env for the 7 conventional models + simulation
 ├── medsam.yaml                      # Conda env for MedSAM/MedSAM2
-├── requirements.txt                 # Pip-only fallback for non-conda users
 └── LICENSE                          # Apache-2.0
 ```
 
