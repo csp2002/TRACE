@@ -33,6 +33,7 @@ python -m data_preparation.nifti_to_2d \
     --data        <dataset>                 # one of: kits, lits, pancreas, colon
     --data_prefix /path/to/raw/<dataset>/   # raw NIfTI root for that dataset
     --save_folder ./2D_data/<dataset>/      # optional; defaults to ./2D_data/<dataset>
+    --split_pkl   /path/to/split.pkl        # optional; see "Train / test split" below
 ```
 
 Per-dataset preprocessing details (all baked into `nifti_to_2d.py`):
@@ -43,6 +44,43 @@ Per-dataset preprocessing details (all baked into `nifti_to_2d.py`):
 - Apply min–max normalisation to map intensities into `[0, 1]`.
 - Extract 2D axial slices and retain only those that contain foreground tumor pixels.
 - Save each retained slice as a grayscale PNG together with its binary mask, organised by case.
+
+#### Train / test split (`split.pkl`)
+
+`nifti_to_2d.py` partitions raw cases into the `train/` and `test/` 2D folders by reading a `split.pkl` file (binary pickle). Format:
+
+```python
+{
+    0: {                                                   # outer is dict {0: ...} or list [{...}]
+        "train": {                                         # case_id -> (img_path, seg_path),
+            "case_00527": ("dataset/case_00527/imaging.nii.gz",
+                           "dataset/case_00527/segmentation.nii.gz"),
+            ...
+        },
+        "val":  { ... },                                   # held out, not consumed by this script
+        "test": { ... },
+    }
+}
+```
+
+The image and segmentation paths inside each entry are **relative to `--data_prefix`**.
+
+We ship the canonical `split.pkl` for each public dataset under [`data_preparation/splits/<dataset>/split.pkl`](splits/). They originate from the [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter) repository's `datafile/<dataset>/split.pkl` (for pancreas / LiTS / colon) and from the [KiTS23](https://github.com/neheller/kits23) official release (for kits). The case counts match what the paper reports:
+
+| Dataset  | Train | Val | Test |
+|----------|------:|----:|-----:|
+| kits     | 342   | 48  | 99   |
+| pancreas | 196   | 28  | 57   |
+| lits     | 83    | 11  | 24   |
+| colon    | 89    | 11  | 26   |
+
+The script's resolution order for `split.pkl` is:
+
+1. `--split_pkl <path>` if you pass it explicitly.
+2. `<data_prefix>/split.pkl`, if it exists. Mirrors the 3DSAM-adapter convention of keeping the split file next to the raw NIfTI volumes.
+3. Otherwise the bundled file at `data_preparation/splits/<dataset>/split.pkl`.
+
+So if your raw NIfTI tree already contains a `split.pkl` (e.g. you cloned 3DSAM-adapter's `datafile/<dataset>/`), the script picks it up automatically; otherwise it falls back to the bundled copy and the run still works without any extra setup.
 
 The resulting layout is:
 
