@@ -43,7 +43,7 @@ class RandomGenerator(object):
         sample = {'image': image, 'label': label.long()}
         return sample
 def random_rot_flip_all(img, lbl, ref_img, ref_lbl):
-    """同步旋转 + 翻转，保证主图和参考图一致变换"""
+    """Synchronized rotate + flip so the main image and the reference image undergo the same transform."""
     k = np.random.randint(0, 4)
     axis = np.random.randint(0, 2)
     
@@ -59,7 +59,7 @@ def random_rot_flip_all(img, lbl, ref_img, ref_lbl):
     
     return img, lbl, ref_img, ref_lbl
 def random_rotate_all(img, lbl, ref_img, ref_lbl):
-    """同步任意角度旋转"""
+    """Synchronized arbitrary-angle rotation."""
     angle = np.random.randint(-20, 20)
     
     img = rotate(img, angle, reshape=False, order=0, mode='nearest')
@@ -78,7 +78,7 @@ class RandomGenerator_ref(object):
         ref_image = sample['ref_image']
         ref_label = sample['ref_mask']
 
-        # 同步数据增强
+        # Synchronized data augmentation
         if random.random() > 0.5:
             image, label, ref_image, ref_label = random_rot_flip_all(image, label, ref_image, ref_label)
         elif random.random() > 0.5:
@@ -106,7 +106,7 @@ class RandomGenerator_ref(object):
             'ref_image': ref_image,
             'ref_mask': ref_label
         }
-class Synapse_dataset(Dataset):
+class Dataset_baseline(Dataset):
     def __init__(self, base_dir, mode, transform=None):
         self.transform = transform  # using transform in torch!
         # self.split = split
@@ -194,13 +194,13 @@ class Synapse_dataset(Dataset):
         # sample = {'image': image, 'label': mask, 'ref_image': ref_image, 'ref_label': ref_mask}
         if self.transform:
             sample = self.transform(sample)
-            #倒数第二个文件夹名作为case_name
+            # Use the second-to-last directory name as case_name
         sample['ref_image'] = ref_image
         sample['ref_mask'] = ref_mask
         sample['case_name'] = os.path.basename(os.path.dirname(image_path))
         sample['image_path'] = image_path
         sample['orig_size'] = np.array([x, y])  # original H, W before zoom to 224
-        #打印sample的所有key
+        # Print every key in the sample dict
         # print('sample:', sample.keys())
         return sample
 class Dataset_middle(Dataset):   # use middle slice as reference image
@@ -244,7 +244,7 @@ class Dataset_middle(Dataset):   # use middle slice as reference image
         image_path = self.image_paths[idx]
         mask_path  = self.mask_paths[idx]
 
-        # ---- 原始加载 & 归一化/缩放（保持不变）----
+        # ---- Original loading + normalization + resize (unchanged) ----
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask  = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
         image = (image - image.min()) / (image.max() - image.min())
@@ -253,27 +253,27 @@ class Dataset_middle(Dataset):   # use middle slice as reference image
         image = zoom(image, (224 / x, 224 / y), order=3)
         mask  = zoom(mask,  (224 / x, 224 / y), order=0)
 
-        # ========== [CHANGED] 选取 reference：用 middle-slice JSON ==========
+        # ========== [CHANGED] reference is selected from the middle-slice JSON ==========
         patient = os.path.basename(os.path.dirname(image_path))   # CT/<patient>/<file>
-        ref_image_path, ref_mask_path = image_path, mask_path     # 默认回退：用当前切片自身
+        ref_image_path, ref_mask_path = image_path, mask_path     # default fallback: use the current slice
 
         info = self.ref_map.get(patient)
         if isinstance(info, dict):
-            # 优先使用 JSON 里记录的绝对路径
+            # Prefer the absolute path recorded in the JSON
             cand_ct  = info.get("ct_path")
-            cand_msk = info.get("mask_path")  # 可能为 None
+            cand_msk = info.get("mask_path")  # may be None
             if cand_ct and os.path.exists(cand_ct):
                 ref_image_path = cand_ct
             else:
                 print(f"[WARN] middle-slice not found: {cand_ct}. Will fall back to current slice.")
-            # ref_mask_path 允许为 None（若该病人无任何 mask），这种情况回退到当前样本的 mask
+            # ref_mask_path may be None (if the patient has no mask); fall back to the current sample's mask
             if cand_msk and os.path.exists(cand_msk):
                 ref_mask_path = cand_msk
             else:
                 print(f"[WARN] middle-slice not found: {cand_msk}. Will fall back to current slice.")
         # print('image_path:', image_path)
         # print('ref_image_path:', ref_image_path)
-        # 加载 reference 并做同样预处理（保持不变）
+        # Load the reference and apply the same preprocessing (unchanged)
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
         ref_mask  = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
         ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
@@ -328,7 +328,7 @@ class Dataset_neighbor(Dataset):   # use NEIGHBOR slice as reference image (from
                     image_paths.append(ct_path)
                     mask_paths.append(mask_path)
                 else:
-                    # 你认为全标注，所以缺一个就报错更符合“终端报错”的诉求
+                    # We treat the dataset as fully annotated, so a missing mask should raise immediately
                     raise FileNotFoundError(
                         f"[FATAL] Missing mask for CT slice:\n  CT: {ct_path}\n  Mask: {mask_path}"
                     )
@@ -341,7 +341,7 @@ class Dataset_neighbor(Dataset):   # use NEIGHBOR slice as reference image (from
         image_path = self.image_paths[idx]
         mask_path  = self.mask_paths[idx]
 
-        # ---- 原始加载 & 归一化/缩放（保持不变）----
+        # ---- Original loading + normalization + resize (unchanged) ----
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask  = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
         image = (image - image.min()) / (image.max() - image.min() + 1e-8)
@@ -350,7 +350,7 @@ class Dataset_neighbor(Dataset):   # use NEIGHBOR slice as reference image (from
         image = zoom(image, (224 / x, 224 / y), order=3)
         mask  = zoom(mask,  (224 / x, 224 / y), order=0)
 
-        # ========== [CHANGED] 选取 reference：用 neighbor-slice JSON（按 slice 级别） ==========
+        # ========== [CHANGED] reference is selected from the neighbor-slice JSON (per slice) ==========
         patient = os.path.basename(os.path.dirname(image_path))   # CT/<patient>/<file>
         slice_fname = os.path.basename(image_path)
 
@@ -376,7 +376,7 @@ class Dataset_neighbor(Dataset):   # use NEIGHBOR slice as reference image (from
                 f"  ref_mask_path={ref_mask_path}"
             )
 
-        # ---- 加载 reference 并做同样预处理（保持不变）----
+        # ---- Load the reference and apply the same preprocessing (unchanged) ----
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
         ref_mask  = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
         ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min() + 1e-8)

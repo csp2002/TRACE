@@ -17,9 +17,9 @@ from tqdm import tqdm
 from .utils import DiceLoss
 from torchvision import transforms
 
-def trainer_synapse(args, model, snapshot_path):
-    from .datasets.dataset_synapse import Synapse_dataset, RandomGenerator, RandomGenerator_ref
-    from .datasets.dataset_synapse import Dataset_middle, Dataset_neighbor
+def trainer_tumor(args, model, snapshot_path):
+    from .datasets.tumor_dataset import Dataset_baseline, RandomGenerator, RandomGenerator_ref
+    from .datasets.tumor_dataset import Dataset_middle, Dataset_neighbor
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -39,7 +39,7 @@ def trainer_synapse(args, model, snapshot_path):
                                     [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
         print('Using neighbor-slice reference dataset')
     else:
-        db_train = Synapse_dataset(base_dir=args.root_path,
+        db_train = Dataset_baseline(base_dir=args.root_path,
                                    transform=transforms.Compose(
                                        [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode='train')
         print('Using baseline (no-reference) dataset')
@@ -96,14 +96,6 @@ def trainer_synapse(args, model, snapshot_path):
             else:
                 loss_ce = ce_loss(outputs, label_batch[:].long())
                 loss_dice = dice_loss(outputs, label_batch, softmax=True)
-            # if args.auxiliary_loss and args.has_confidence:
-            #     loss_ce = loss_ce + ce_loss(refined_mask, label_batch[:].long())
-            #     loss_dice = loss_dice + dice_loss(refined_mask, label_batch, softmax=True)
-            # if args.exp_name == 'sli2vol_v3o2' or args.exp_name == 'vol2flow_v3o2':
-            #     # print('modulation_map:', modulation_map.shape, modulation_map.max(), modulation_map.min())
-            #     # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-            #     loss_mod = F.binary_cross_entropy(modulation_map, ref_mask)
-            #     loss = 0.5 * loss_ce + 0.5 * loss_dice + 0.1 * loss_mod
             
             loss = 0.5 * loss_ce + 0.5 * loss_dice 
             optimizer.zero_grad()

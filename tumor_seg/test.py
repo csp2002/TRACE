@@ -9,7 +9,7 @@ import torch.backends.cudnn as cudnn
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from .datasets.dataset_synapse import *
+from .datasets.tumor_dataset import *
 from .utils import test_single_volume
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from .networks.vit_seg_modeling import TransUNet_ours
@@ -20,7 +20,6 @@ from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
 from .networks.swin_unet import SwinUnet,SwinUnet_ours
 from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
-from .networks.MISSFormer import MISSFormer
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 from PIL import Image
 
@@ -154,8 +153,6 @@ if __name__ == "__main__":
                         default='', help='experiment_name')
     parser.add_argument('--num_classes', type=int,
                         default=2, help='output channel of network')
-    # parser.add_argument('--list_dir', type=str,
-    #                     default='./lists/lists_Synapse', help='list dir')
     parser.add_argument('--max_iterations', type=int,default=20000, help='maximum epoch number to train')
     parser.add_argument('--max_epochs', type=int, default=150, help='maximum epoch number to train')
     parser.add_argument('--batch_size', type=int, default=24,
@@ -188,20 +185,7 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
-    # dataset_config = {
-    #     'Synapse': {
-    #         'Dataset': Synapse_dataset,
-    #         'volume_path': '../data/Synapse/test_vol_h5',
-    #         'list_dir': './lists/lists_Synapse',
-    #         'num_classes': 9,
-    #         'z_spacing': 1,
-    #     },
-    # }
     dataset_config = {
-        'local': {
-            'root_path': './2D_data/local/test',
-            'num_classes': 2,
-        },
         'kits': {
             'root_path': './2D_data/kits/test',
             'num_classes': 2,
@@ -231,7 +215,7 @@ if __name__ == "__main__":
         args.Dataset = Dataset_neighbor
         print('Using neighbor-slice reference dataset')
     else:
-        args.Dataset = Synapse_dataset
+        args.Dataset = Dataset_baseline
         print('Using baseline (no-reference) dataset')
     # args.list_dir = dataset_config[dataset_name]['list_dir']
     # args.z_spacing = dataset_config[dataset_name]['z_spacing']
@@ -270,35 +254,6 @@ if __name__ == "__main__":
     if args.exp_name == 'transunet':
         net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
         print('Using original TransUNet!')
-    # elif not args.has_confidence:
-    #     net = My_ViT_seg2(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol' or args.exp_name == 'vol2flow':
-    #     net = My_ViT_seg_v3(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol_v2' or args.exp_name == 'vol2flow_v2':
-    #     net = My_ViT_seg_v4(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol_v3o1' or args.exp_name == 'vol2flow_v3o1':
-    #     net = My_ViT_seg_v5(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol_v3o2' or args.exp_name == 'vol2flow_v3o2':
-    #     net = My_ViT_seg_v6(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol_v4' or args.exp_name == 'vol2flow_v4':
-    #     net = My_ViT_seg_v7(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'v5':
-    #     net = My_ViT_seg_v8(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v8')
-    # elif args.exp_name == 'v6':
-    #     config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
-    #     config_small.n_classes = args.num_classes
-    #     config_small.n_skip = args.n_skip
-    #     config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    #     net = My_ViT_seg_v9(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v9')
-    # elif args.exp_name == 'v6.1' or args.exp_name == 'v6.2' or args.exp_name == 'v6.3' or args.exp_name == 'v6.5':
-    #     config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
-    #     config_small.n_classes = args.num_classes
-    #     config_small.n_skip = args.n_skip
-    #     config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    #     net = My_ViT_seg_v10(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v10')
     elif args.exp_name == 'transunet_ours':
         config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
         config_small.n_classes = args.num_classes
@@ -327,20 +282,15 @@ if __name__ == "__main__":
     elif args.exp_name == 'swin_unet':
         print('Using swin unet baseline model')
         net = SwinUnet(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
-        # net.load_from("./tumor_seg/networks/swin_tiny_patch4_window7_224.pth")
     elif args.exp_name == 'swin_unet_ours':
         print('Using swin unet + ours model')
         net = SwinUnet_ours(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
-        # net.load_from("./tumor_seg/networks/swin_tiny_patch4_window7_224.pth")
     elif args.exp_name == 'FAT_Net':
         print('Using FAT_Net baseline model')
         net = FAT_Net(n_channels=1, n_classes=args.num_classes).cuda()
     elif args.exp_name == 'FAT_Net_ours':
         print('Using FAT_Net + ours model')
         net = FATNet_ours(in_chan=1, num_classes=args.num_classes).cuda()
-    elif args.exp_name == 'MISSFormer':
-        print('Using MISSFormer baseline model')
-        net = MISSFormer(num_classes=args.num_classes).cuda()
     elif args.exp_name == 'H2Former':
         print('Using H2Former baseline model')
         net = res34_swin_MS(image_size=args.img_size, num_class=args.num_classes).cuda()
@@ -354,8 +304,8 @@ if __name__ == "__main__":
     # snapshot =snapshot.replace('149','39')
     net.load_state_dict(torch.load(snapshot))
     print('Have loaded snapshot in:',snapshot)
-    #计算模型参数量
-    #打印模型参数名字和参数数量
+    # Count model parameters
+    # Print parameter names and counts
     num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module' in name )
     print('Number of parameters in refinement_module:', num_params/1e6, 'M')
     # for name, param in net.named_parameters():
