@@ -14,17 +14,28 @@ from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
 from .networks.swin_unet import SwinUnet,SwinUnet_ours
 from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
-from .networks.MISSFormer import MISSFormer
 from .networks.H2Former import res34_swin_MS,H2Former_ours
-from .trainer import trainer_synapse
+from .networks._download import ensure_weight
+from .trainer import trainer_tumor
+
+
+
+_WEIGHT_URLS = {
+    "swin_tiny": "https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth",
+    "resnet34": "https://download.pytorch.org/models/resnet34-b627a593.pth",
+    "r50_vit_b16": "https://storage.googleapis.com/vit_models/imagenet21k/R50%2BViT-B_16.npz",
+}
+_WEIGHT_PATHS = {
+    "swin_tiny": "./tumor_seg/networks/swin_tiny_patch4_window7_224.pth",
+    "resnet34": "./tumor_seg/networks/resnet34.pth",
+    "r50_vit_b16": "./tumor_seg/networks/R50+ViT-B_16.npz",
+}
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
                     default='', help='root dir for data')
 parser.add_argument('--dataset', type=str,
                     default='', help='experiment_name')
-# parser.add_argument('--list_dir', type=str,
-#                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
                     default=2, help='output channel of network')
 parser.add_argument('--max_iterations', type=int,
@@ -74,15 +85,6 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(args.seed)
     dataset_name = args.dataset
     dataset_config = {
-        # 'Synapse': {
-        #     'root_path': '../data/Synapse/train_npz',
-        #     # 'list_dir': './lists/lists_Synapse',
-        #     'num_classes': 9,
-        # },
-        'local': {
-            'root_path': './2D_data/local/train',
-            'num_classes': 2,
-        },
         'kits': {
             'root_path': './2D_data/kits/train',
             'num_classes': 2,
@@ -132,39 +134,6 @@ if __name__ == "__main__":
         config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
     if args.exp_name == 'transunet':
         net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif not args.has_confidence :
-    #     net = My_ViT_seg2(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol' or args.exp_name == 'vol2flow':
-    #     net = My_ViT_seg_v3(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    # elif args.exp_name == 'sli2vol_v2' or args.exp_name == 'vol2flow_v2':
-    #     net = My_ViT_seg_v4(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v4')
-    # elif args.exp_name == 'vol2flow_v3o1':
-    #     net = My_ViT_seg_v5(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v5')
-    # elif args.exp_name == 'vol2flow_v3o2':
-    #     net = My_ViT_seg_v6(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v6')
-    # elif args.exp_name == 'vol2flow_v4':
-    #     net = My_ViT_seg_v7(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v7')
-    # elif args.exp_name == 'v5':
-    #     net = My_ViT_seg_v8(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v8')
-    # elif args.exp_name == 'v6':
-    #     config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
-    #     config_small.n_classes = args.num_classes
-    #     config_small.n_skip = args.n_skip
-    #     config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    #     net = My_ViT_seg_v9(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v9')
-    # elif args.exp_name == 'v6.1' or args.exp_name == 'v6.2' or args.exp_name == 'v6.3' or args.exp_name == 'v6.5':
-    #     config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
-    #     config_small.n_classes = args.num_classes
-    #     config_small.n_skip = args.n_skip
-    #     config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    #     net = My_ViT_seg_v10(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    #     print('Using My_ViT_seg_v10')
     elif args.exp_name == 'transunet_ours':
         config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
         config_small.n_classes = args.num_classes
@@ -193,11 +162,11 @@ if __name__ == "__main__":
     elif args.exp_name == 'swin_unet':
         print('Using swin unet baseline model')
         net = SwinUnet(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
-        net.load_from("./tumor_seg/networks/swin_tiny_patch4_window7_224.pth")
+        net.load_from(ensure_weight(_WEIGHT_URLS["swin_tiny"], _WEIGHT_PATHS["swin_tiny"]))
     elif args.exp_name == 'swin_unet_ours':
         print('Using swin unet + ours model')
         net = SwinUnet_ours(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
-        net.load_from("./tumor_seg/networks/swin_tiny_patch4_window7_224.pth")
+        net.load_from(ensure_weight(_WEIGHT_URLS["swin_tiny"], _WEIGHT_PATHS["swin_tiny"]))
     elif args.exp_name == 'FAT_Net':
         print('Using FAT_Net baseline model')
         net = FAT_Net(n_channels=1, n_classes=args.num_classes).cuda()
@@ -208,29 +177,25 @@ if __name__ == "__main__":
         print('Using H2Former baseline model')
         net = res34_swin_MS(image_size=args.img_size, num_class=args.num_classes).cuda()
         model_dict = net.state_dict()
-        pre_dict = torch.load('networks/resnet34.pth') 
+        pre_dict = torch.load(ensure_weight(_WEIGHT_URLS["resnet34"], _WEIGHT_PATHS["resnet34"]))
         matched_dict = {k: v for k, v in pre_dict.items() if k in model_dict and v.shape==model_dict[k].shape}
         model_dict.update(matched_dict)
         net.load_state_dict(model_dict)
-        # 加载resnet34.pth
-        # net.load_state_dict(torch.load("networks/resnet34.pth"), strict=False)
-        # print('Successfully loaded resnet34.pth')
     elif args.exp_name == 'H2Former_ours':
         print('Using H2Former + ours model')
         net = H2Former_ours(img_size=args.img_size, num_classes=args.num_classes).cuda()
         model_dict = net.state_dict()
-        pre_dict = torch.load('networks/resnet34.pth') 
+        pre_dict = torch.load(ensure_weight(_WEIGHT_URLS["resnet34"], _WEIGHT_PATHS["resnet34"]))
         matched_dict = {k: v for k, v in pre_dict.items() if k in model_dict and v.shape==model_dict[k].shape}
         model_dict.update(matched_dict)
         net.load_state_dict(model_dict)
-    elif args.exp_name == 'MISSFormer':
-        print('Using MISSFormer baseline model')
-        net = MISSFormer(num_classes=args.num_classes).cuda()
     else:
-        # net = My_ViT_seg_v2(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
         raise Exception('Invalid experiment name, cannot find appropriate model')
 
     if args.exp_name == 'transunet' or args.exp_name == 'transunet_ours' :  #for transunet
+        config_vit.pretrained_path = ensure_weight(
+            _WEIGHT_URLS["r50_vit_b16"], _WEIGHT_PATHS["r50_vit_b16"]
+        )
         net.load_from(weights=np.load(config_vit.pretrained_path))
         
     num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module' in name )
@@ -241,15 +206,15 @@ if __name__ == "__main__":
         args.exp_name + dataset_name + str(args.img_size)
         ckpt_path = os.path.join('../model', 'TU'+ '_' + dataset_name + str(args.img_size), ckpt_folder, 'epoch_149.pth')
         print('loading pretrained model from {}'.format(ckpt_path))
-        #将该路径下的模型参数装载进net，不要求严格
+        # Load the checkpoint into the net (non-strict)
         net.load_state_dict(torch.load(ckpt_path), strict=False)
         print(' Successfully loaded pretrained model from {}'.format(ckpt_path))
-        #参数冻结
+        # Freeze parameters
         for name, param in net.named_parameters():
             if 'fusion' in name or 'refinement' in name:
                 param.requires_grad = True
             else:
                 param.requires_grad = False
     # raise Exception
-    trainer = {dataset_name: trainer_synapse,}
+    trainer = {dataset_name: trainer_tumor,}
     trainer[dataset_name](args, net, snapshot_path)

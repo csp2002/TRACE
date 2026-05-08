@@ -111,33 +111,7 @@ python -m data_preparation.extract_neighbor_slice \
 
 These produce JSON files (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`) consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
 
-## 3. ImageNet-pretrained backbone weights (for the 7 conventional models)
-
-Required to initialise the 7 conventional model backbones at training time. Download each file and place it at the listed path **relative to the repository root**. All commands assume you run from the repo root.
-
-| Backbone | File | Source | Place at |
-|---|---|---|---|
-| **TransUNet** | `R50+ViT-B_16.npz` | Google ViT release: `https://console.cloud.google.com/storage/vit_models/imagenet21k/` (download `R50+ViT-B_16.npz`) | `./model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz` |
-| **SwinUNet** | `swin_tiny_patch4_window7_224.pth` | Microsoft Swin Transformer: `https://github.com/microsoft/Swin-Transformer` → "Swin-T (ImageNet-1k pretrained)" | `./tumor_seg/networks/swin_tiny_patch4_window7_224.pth` |
-| **MedFormer / AttentionUNet / UNet++ / FATNet / H2Former** | `resnet34.pth` | torchvision: `https://download.pytorch.org/models/resnet34-b627a593.pth` (rename to `resnet34.pth` after download) | `./tumor_seg/networks/resnet34.pth` |
-
-Quick command sketch:
-
-```bash
-mkdir -p ./model/vit_checkpoint/imagenet21k ./tumor_seg/networks
-
-# TransUNet ImageNet-21k init (manual download from Google Cloud Storage; needs a browser)
-# Place R50+ViT-B_16.npz under ./model/vit_checkpoint/imagenet21k/
-
-# SwinUNet (manual download from Microsoft's release page)
-# Place swin_tiny_patch4_window7_224.pth under ./tumor_seg/networks/
-
-# ResNet-34 (direct curl)
-curl -L -o ./tumor_seg/networks/resnet34.pth \
-    https://download.pytorch.org/models/resnet34-b627a593.pth
-```
-
-## 4. Foundation-model weights (for MedSAM and MedSAM2)
+## 3. Foundation-model weights (for MedSAM and MedSAM2)
 
 | Backbone | File | Source | Place at |
 |---|---|---|---|
@@ -146,7 +120,7 @@ curl -L -o ./tumor_seg/networks/resnet34.pth \
 
 For up-to-date download URLs, see the upstream README of each project.
 
-## 5. Trained TRACE checkpoints
+## 4. Trained TRACE checkpoints
 
 We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 4 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
 

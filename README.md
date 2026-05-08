@@ -16,8 +16,7 @@ TRACE/
 │   ├── test.py
 │   ├── simulation.py
 │   ├── simulation_other_metrics.py
-│   ├── edit_workload.py
-│   └── middle_finetune.py
+│   └── edit_workload.py
 ├── foundation_models/
 │   ├── medsam/                      # MedSAM (vendored) + TRACE training/inference
 │   └── medsam2/                     # MedSAM2 (vendored) + TRACE training/inference
@@ -43,7 +42,7 @@ See [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.m
 
 - Download links for the four publicly available CT datasets (KiTS, LiTS, MSD-Pancreas, MSD-Colon).
 - The full preprocessing pipeline (NIfTI → 2D PNG slices → reference-slice annotations).
-- Where to place the ImageNet-pretrained backbone weights (TransUNet R50+ViT-B, SwinUNet, ResNet-34) and the MedSAM / MedSAM2 vendor weights.
+- Where to place the MedSAM / MedSAM2 vendor weights. (ImageNet-pretrained backbone weights for the 7 conventional models are downloaded automatically on first run by `tumor_seg/train.py`.)
 - Notes on trained TRACE checkpoint layout and patient exclusion.
 
 ## 4. Quick start
@@ -65,7 +64,7 @@ python -m tumor_seg.train --exp_name transunet --dataset kits
 python -m tumor_seg.train --exp_name transunet_ours --dataset kits
 ```
 
-The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `fat_net`, `h2former` — each with an `_ours` counterpart). Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
+The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `FAT_Net`, `H2Former` — each with an `_ours` counterpart). Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
 
 Trained checkpoints are written to `./checkpoints/<exp_subdir>/...`; the test and simulation drivers below load from the same location.
 
