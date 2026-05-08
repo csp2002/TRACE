@@ -55,8 +55,8 @@ checkpoints/
 weights/
 pretrained/
 snapshots/
-model/
-models/
+/model/
+/models/
 
 # Data formats (do not commit data)
 *.nii

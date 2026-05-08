@@ -66,18 +66,18 @@ def data_extraction(args):
         seg_path = seg_files_train[i]
         img = nib.load(img_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
         seg = nib.load(seg_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
-        #检查形状是否一致，如果不一致则打印出来
+        # Sanity-check that the image and segmentation shapes match; warn if they don't
         assert img.shape == seg.shape, f"shape mismatch: {img.shape} vs {seg.shape}"
         img[np.isnan(img)] = 0
         seg[np.isnan(seg)] = 0
         if args.target_class is not None:
             seg = (seg == args.target_class).astype(np.float32)
-        #根据intensity_range先clipping再将img归一化到0-1之间
+        # Clip by intensity_range, then min-max normalize the image into [0, 1]
         img = np.clip(img, args.intensity_range[0], args.intensity_range[1])
         img = (img - args.intensity_range[0]) / (args.intensity_range[1] - args.intensity_range[0])
-        if args.data == 'colon':  #case_name是文件名去掉后缀
+        if args.data == 'colon':  # case_name = filename without the .nii.gz suffix
             case_name = os.path.basename(img_path).split('.')[0]
-        else:  #case_name是倒数第二个文件夹名
+        else:  # case_name = the second-to-last directory name in the path
             case_name = os.path.basename(os.path.dirname(img_path))
         image_case_folder = os.path.join(args.save_folder, 'train', 'CT', case_name)
         seg_case_folder = os.path.join(args.save_folder, 'train', 'Mask', case_name)
@@ -86,7 +86,7 @@ def data_extraction(args):
         for j in range(img.shape[0]):
             img_slice = img[j]
             seg_slice = seg[j]
-            #只保存seg里有前景的slice，用plt.imsave保存为png,文件名为slice_index.png,index用三位数表示
+            # Save only slices that contain foreground voxels as PNG; filename is the slice index, zero-padded to 3 digits
             if seg_slice.sum() != 0:
                 plt.imsave(os.path.join(image_case_folder, f'{j:03d}.png'), img_slice, cmap='gray')
                 plt.imsave(os.path.join(seg_case_folder, f'{j:03d}.png'), seg_slice, cmap='gray')
@@ -97,13 +97,13 @@ def data_extraction(args):
         seg_path = seg_files_test[i]
         img = nib.load(img_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
         seg = nib.load(seg_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
-        #检查形状是否一致，如果不一致则打印出来
+        # Sanity-check that the image and segmentation shapes match; warn if they don't
         assert img.shape == seg.shape, f"shape mismatch: {img.shape} vs {seg.shape}"
         img[np.isnan(img)] = 0
         seg[np.isnan(seg)] = 0
         if args.target_class is not None:
             seg = (seg == args.target_class).astype(np.float32)
-        #根据intensity_range先clipping再将img归一化到0-1之间
+        # Clip by intensity_range, then min-max normalize the image into [0, 1]
         img = np.clip(img, args.intensity_range[0], args.intensity_range[1])
         img = (img - args.intensity_range[0]) / (args.intensity_range[1] - args.intensity_range[0])
         # print('img:', img.shape, img.max(), img.min())
@@ -119,7 +119,7 @@ def data_extraction(args):
         for j in range(img.shape[0]):
             img_slice = img[j]
             seg_slice = seg[j]
-            #只保存seg里有前景的slice，用plt.imsave保存为png,文件名为slice_index.png,index用三位数表示
+            # Save only slices that contain foreground voxels as PNG; filename is the slice index, zero-padded to 3 digits
             if seg_slice.sum() != 0:
                 cnt += 1
                 plt.imsave(os.path.join(image_case_folder, f'{j:03d}.png'), img_slice, cmap='gray')

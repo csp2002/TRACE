@@ -421,7 +421,7 @@ class VisionTransformer(nn.Module):   #original in TransUNet
                     for uname, unit in block.named_children():
                         unit.load_from(res_weight, n_block=bname, n_unit=uname)
 class LinearAlign(nn.Module):
-    """1x1 Conv + BN（无激活），轻量通道对齐"""
+    """1x1 Conv + BN (no activation); lightweight channel alignment."""
     def __init__(self, ch):
         super().__init__()
         self.conv = nn.Conv2d(ch, ch, kernel_size=1, bias=False)
@@ -430,15 +430,15 @@ class LinearAlign(nn.Module):
         return self.bn(self.conv(x))
 def compute_conf_and_pyramid(ref_mask, ref_gt, w_g=0.7, detach=True):
     """
-    ref_mask: (B,1,224,224)  概率（前景通道）
+    ref_mask: (B,1,224,224) probability (foreground channel)
     ref_gt:   (B,1,224,224)  {0,1}
-    return: (conf_112, conf_56, conf_28)  三个尺度
+    return: (conf_112, conf_56, conf_28); three scales
     """
     eps = 1e-6
     p = ref_mask.clamp(eps, 1 - eps)
-    # 与GT一致性
+    # Agreement with the GT
     conf_gt = 1.0 - (p - ref_gt).abs()                    # [0,1]
-    # 熵置信度（1 - 归一化熵）
+    # Entropy-based confidence (1 - normalized entropy)
     H = -(p*torch.log(p) + (1-p)*torch.log(1-p))          # [0, log2]
     conf_ent = 1.0 - (H / (torch.log(torch.tensor(2.0, device=p.device))))
     conf = torch.clamp(w_g * conf_gt + (1 - w_g) * conf_ent, 0.0, 1.0)  # (B,1,224,224)
@@ -454,7 +454,7 @@ class Decoder_AlignPlusConf(nn.Module):
         super().__init__()
         self.init_fuse = Conv2dReLU(1024, 512, kernel_size=3, padding=1)
 
-        # 轻量对齐
+        # Lightweight alignment
         self.t_align3 = LinearAlign(512); self.r_align3 = LinearAlign(512)
         self.t_align2 = LinearAlign(256); self.r_align2 = LinearAlign(256)
         self.t_align1 = LinearAlign(64);  self.r_align1 = LinearAlign(64)
@@ -496,8 +496,8 @@ class Decoder_AlignPlusConf(nn.Module):
         return self.out_conv(x)
 from timm import create_model
 class InputAdapter(nn.Module):
-    """把 n 通道的 [pred, image(, gt)] 映射到 3 通道，以便完整复用 ImageNet 预训练。
-       结构：Conv3x3 → BN → GELU → Conv1x1 （轻量、稳定）
+    """Project the n-channel [pred, image(, gt)] tensor down to 3 channels so the full ImageNet-pretrained backbone can be reused.
+       Architecture: Conv3x3 -> BN -> GELU -> Conv1x1 (light and stable).
     """
     def __init__(self, in_ch, mid_ch=16, out_ch=3, use_bn=True, use_act=True):
         super().__init__()
@@ -511,11 +511,11 @@ class InputAdapter(nn.Module):
         return self.net(x)
 class ResNetEncoderAligned(nn.Module):
     """
-    用 timm 的 ResNet（此处改成 resnet18）做 backbone，
-    并投影成你原 decoder 需要的接口：
-      x        = (B, 1024, 14, 14)   ← 来自 layer3(14x14) 投到 1024
+    Use timm's ResNet (resnet18 here) as the backbone,
+    and project it into the interface the original decoder expects:
+      x        = (B, 1024, 14, 14)   <- projected from layer3 (14x14) to 1024 channels
       features = [ (B,512,28,28), (B,256,56,56), (B,64,112,112) ]
-                 ↑    layer2         ↑ layer1         ↑ stem 上采样
+                 ^    layer2         ^ layer1         ^ stem (upsampled)
     """
     def __init__(self, variant='resnet18', in_chans=3, pretrained=True, keep_rgb_weights=None):
         super().__init__()
@@ -524,7 +524,7 @@ class ResNetEncoderAligned(nn.Module):
         self.input_proj = InputAdapter(in_chans, out_ch=3) if keep_rgb_weights else None
         backbone_in = 3 if keep_rgb_weights else in_chans
 
-        # 关键：这里把 variant 设为 resnet18
+        # Key: variant is set to resnet18
         self.backbone = create_model(
             variant,
             pretrained=pretrained,
@@ -534,7 +534,7 @@ class ResNetEncoderAligned(nn.Module):
         )
         chs = [fi['num_chs'] for fi in self.backbone.feature_info]  # resnet18: [64, 64, 128, 256]
 
-        # 对齐到你 decoder 期望的通道
+        # Align channels with what the decoder expects
         self.to_064_112 = nn.Conv2d(chs[0],  64, 1, bias=False)    # stem(112) → 64
         self.to_256_56  = nn.Conv2d(chs[1], 256, 1, bias=False)    # layer1(56) → 256
         self.to_512_28  = nn.Conv2d(chs[2], 512, 1, bias=False)    # layer2(28) → 512
@@ -542,8 +542,8 @@ class ResNetEncoderAligned(nn.Module):
 
     def forward(self, x):
         if self.input_proj is not None:
-            x = self.input_proj(x)           # n→3（仅在需要复用3ch预训练时）
-        f112, f56, f28, f14 = self.backbone(x)  # timm 顺序: [112,56,28,14]
+            x = self.input_proj(x)           # n -> 3 (only when reusing the 3-channel pretrained weights)
+        f112, f56, f28, f14 = self.backbone(x)  # timm ordering: [112,56,28,14]
 
         # 112：stem → 64
         f112 = self.to_064_112(f112)
@@ -551,10 +551,10 @@ class ResNetEncoderAligned(nn.Module):
         f56  = self.to_256_56(f56)
         # 28：layer2 → 512
         f28  = self.to_512_28(f28)
-        # 14：layer3 → 1024（作为瓶颈 x）
+        # 14: layer3 -> 1024 (used as the bottleneck x)
         x14  = self.to_1024_14(f14)
 
-        # 你的 decoder 期望顺序：[512@28, 256@56, 64@112]
+        # Decoder expects order [512@28, 256@56, 64@112]
         features = [f28, f56, f112]
         return x14, features
 class target_encoder_resnet(nn.Module):
@@ -590,7 +590,7 @@ class TRACE(nn.Module):   #
         #     x = x.repeat(1,5,1,1)
         # x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
         # print('x:',x.shape)
-        # reference 输入 = [ref_image, ref_mask, ref_gt]，shape (B,3,224,224)
+        # Reference input = [ref_image, ref_mask, ref_gt], shape (B,3,224,224)
         ref_mask = reference[:, 1:2]   # (B,1,224,224)
         ref_gt   = reference[:, 2:3]   # (B,1,224,224)
         x_tar, features_tar = self.target_encoder(target)
@@ -662,7 +662,7 @@ class TransUNet_ours(nn.Module):
         logits_ref = self.segmentation_head(x_ref)  #bs,2,224,224
 
         probs = torch.softmax(logits, dim=1)  # (bs, 2, 224, 224)
-        ori_mask = probs[:, 1:2, :, :]        # 取出“前景”类别的概率，仍保持 shape 为 (bs, 1, 224, 224)
+        ori_mask = probs[:, 1:2, :, :]        # Extract the 'foreground' class probability; shape stays (bs, 1, 224, 224)
 
         probs_ref = torch.softmax(logits_ref, dim=1)
         ref_mask = probs_ref[:, 1:2, :, :]  # (bs, 1, 224, 224)
@@ -682,15 +682,15 @@ class TransUNet_ours(nn.Module):
         preds_all.append(final_pred)
 
         for it in range(1, max(1, self.refine_iters) ):
-        # 把上一轮的输出变成下一轮的 target prediction
+        # Feed the previous iteration's output as the next iteration's target prediction
             next_mask = torch.softmax(final_pred, dim=1)[:, 1:2]   
 
             if self.detach_between_iters:
                 next_mask = next_mask.detach()
 
             target_2ch = torch.cat([ori_image, next_mask], dim=1)      # (B,2,H,W)
-            # reference 一般保持不变；如果你希望同步更新 ref_pred，也可以把 ref_mask 改成 logits_ref 的迭代版
-            # 这里保持 ref_3ch 不变：
+            # Reference typically stays unchanged; if you want to update ref_pred too, swap ref_mask for the iterated logits_ref
+            # Keep ref_3ch unchanged here:
             # ref_3ch = torch.cat([ref_image_raw, ref_mask, ref_gt], dim=1)
 
             final_pred = self.refinement_module(target_2ch, ref_image)

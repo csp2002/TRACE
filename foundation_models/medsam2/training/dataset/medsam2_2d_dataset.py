@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 2D训练数据集
-支持middle和neighbor两种参考slice模式
+MedSAM2 2D training dataset.
+Supports both 'middle' and 'neighbor' reference-slice modes.
 """
 
 import os
@@ -20,18 +20,18 @@ from torchvision.transforms import InterpolationMode
 
 class MedSAM2_2D_Dataset(Dataset):
     """
-    MedSAM2 2D训练数据集
-    从middle或neighbor slice的GT Mask中提取box prompt
+    MedSAM2 2D training dataset.
+    Extract a box prompt from the middle- or neighbor-slice GT mask.
     """
     def __init__(self, base_dir, mode='train', ref_type='middle', image_size=512, bbox_shift=10, use_augmentation=True):
         """
         Args:
-            base_dir: 数据集根目录，例如 './2D_data/colon'
-            mode: 'train' 或 'test'
-            ref_type: 'middle' 或 'neighbor'
-            image_size: 图像尺寸，默认512（MedSAM2通常使用512x512）
-            bbox_shift: bounding box的随机扰动范围
-            use_augmentation: 是否使用数据增强（训练时使用，测试时不使用）
+            base_dir: dataset root, e.g. './2D_data/colon'
+            mode: 'train' or 'test'
+            ref_type: 'middle' or 'neighbor'
+            image_size: model input size, default 512 (MedSAM2 typically uses 512x512)
+            bbox_shift: random perturbation range applied to the bounding box
+            use_augmentation: enable data augmentation (used at train time, disabled at test time)
         """
         self.base_dir = base_dir
         self.dataset_name = os.path.basename(base_dir.rstrip('/'))
@@ -41,10 +41,10 @@ class MedSAM2_2D_Dataset(Dataset):
         self.bbox_shift = bbox_shift
         self.use_augmentation = use_augmentation and (mode == 'train')
         
-        # 获取图像和mask路径
+        # Collect image and mask paths
         self.image_paths, self.mask_paths = self._get_image_mask_paths()
         
-        # 加载参考slice的annotation字典
+        # Load the reference-slice annotation dict
         self.ref_map = {}
         if ref_type == 'middle':
             dict_path = os.path.join(self.base_dir, self.mode, "annotation_dict_middle.json")
@@ -61,7 +61,7 @@ class MedSAM2_2D_Dataset(Dataset):
             print(f"[WARN] {ref_type} annotation dict not found: {dict_path}")
     
     def _get_image_mask_paths(self):
-        """获取所有图像和mask的路径"""
+        """Collect all image and mask paths."""
         image_paths = []
         mask_paths = []
         ct_dir = os.path.join(self.base_dir, self.mode, "CT")
@@ -91,7 +91,7 @@ class MedSAM2_2D_Dataset(Dataset):
     
     def _apply_affine_to_bbox(self, bbox, affine_params, img_size):
         """
-        对bbox的四个角点应用仿射变换，然后重新计算边界框
+        Apply an affine transform to the four bbox corners and recompute the bounding box.
         
         Args:
             bbox: [x_min, y_min, x_max, y_max]
@@ -105,14 +105,14 @@ class MedSAM2_2D_Dataset(Dataset):
         x_min, y_min, x_max, y_max = bbox
         W, H = img_size
         
-        # 创建一个包含bbox的mask
+        # Create a mask covering the bbox
         bbox_mask = np.zeros((H, W), dtype=np.uint8)
         bbox_mask[int(y_min):int(y_max)+1, int(x_min):int(x_max)+1] = 255
         
-        # 转换为PIL Image
+        # Convert to PIL Image
         bbox_mask_pil = Image.fromarray(bbox_mask)
         
-        # 应用仿射变换
+        # Apply the affine transform
         bbox_mask_transformed = F.affine(
             bbox_mask_pil,
             angle=angle,
@@ -123,10 +123,10 @@ class MedSAM2_2D_Dataset(Dataset):
             fill=0
         )
         
-        # 转换为numpy
+        # Convert back to numpy
         bbox_mask_transformed = np.array(bbox_mask_transformed)
         
-        # 从变换后的mask提取bbox
+        # Extract a new bbox from the transformed mask
         y_indices, x_indices = np.where(bbox_mask_transformed > 128)
         if len(y_indices) > 0 and len(x_indices) > 0:
             new_x_min = float(np.min(x_indices))
@@ -134,10 +134,10 @@ class MedSAM2_2D_Dataset(Dataset):
             new_y_min = float(np.min(y_indices))
             new_y_max = float(np.max(y_indices))
         else:
-            # 如果变换后bbox消失，返回原bbox
+            # If the transformed bbox vanished, fall back to the original bbox
             new_x_min, new_y_min, new_x_max, new_y_max = x_min, y_min, x_max, y_max
         
-        # 限制在图像范围内
+        # Clamp to image bounds
         new_x_min = max(0, min(W - 1, new_x_min))
         new_x_max = max(0, min(W - 1, new_x_max))
         new_y_min = max(0, min(H - 1, new_y_min))
@@ -150,12 +150,12 @@ class MedSAM2_2D_Dataset(Dataset):
         mask_path = self.mask_paths[idx]
         img_name = os.path.basename(image_path)
         
-        # 读取图像和mask
+        # Read the image and mask
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        mask = mask / 255.0  # 归一化到[0, 1]
+        mask = mask / 255.0  # normalize to [0, 1]
         
-        # 转换为RGB格式
+        # Convert to RGB
         if len(image.shape) == 2:
             img_3c = np.repeat(image[:, :, None], 3, axis=-1)
         elif len(image.shape) == 3 and image.shape[2] == 4:
@@ -163,32 +163,32 @@ class MedSAM2_2D_Dataset(Dataset):
         else:
             img_3c = image
         
-        # 调整图像大小到image_size
+        # Resize the image to image_size
         img_resized = transform.resize(
             img_3c, (self.image_size, self.image_size), 
             order=3, preserve_range=True, anti_aliasing=True
         )
         
-        # 确保图像值在[0, 255]范围内
+        # Make sure pixel values are in [0, 255]
         if img_resized.max() > 255 or img_resized.min() < 0:
             img_resized = (img_resized - img_resized.min()) / np.clip(
                 img_resized.max() - img_resized.min(), a_min=1e-8, a_max=None
             ) * 255.0
         img_resized = np.clip(img_resized, 0, 255).astype(np.uint8)
         
-        # 调整mask大小
+        # Resize the mask
         mask_resized = transform.resize(
             mask, (self.image_size, self.image_size),
             order=0, preserve_range=True, mode="constant", anti_aliasing=False
         )
         
-        # 获取参考mask路径
+        # Resolve the reference-mask path
         case_num = os.path.basename(os.path.dirname(mask_path))
         ref_mask_path = None
         ref_image_path = None
         
         if self.ref_type == 'middle':
-            # middle模式：每个病人有一个middle slice
+            # 'middle' mode: one middle slice per patient
             info = self.ref_map.get(case_num)
             if isinstance(info, dict):
                 cand_ct = info.get("ct_path")
@@ -198,25 +198,25 @@ class MedSAM2_2D_Dataset(Dataset):
                 if cand_ct and os.path.exists(cand_ct):
                     ref_image_path = cand_ct
         elif self.ref_type == 'neighbor':
-            # neighbor模式：每个slice有一个对应的neighbor slice
+            # 'neighbor' mode: each slice has its own neighbor slice
             slice_num = os.path.basename(mask_path)
             if case_num in self.ref_map and slice_num in self.ref_map[case_num]:
                 entry = self.ref_map[case_num][slice_num]
                 ref_mask_path = entry.get("ref_mask_path")
                 ref_image_path = entry.get("ref_ct_path")
         
-        # 如果没有找到参考mask，报错
+        # Raise if no reference mask was found
         if ref_mask_path is None or not os.path.exists(ref_mask_path):
             raise FileNotFoundError(f"Reference mask not found: {ref_mask_path}")
         
-        # 读取参考mask和图像（for the TRACE variant）
+        # Read the reference mask and image (for the TRACE variant)
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32) / 255.0
         ref_mask_resized = transform.resize(
             ref_mask, (self.image_size, self.image_size),
             order=0, preserve_range=True, mode="constant", anti_aliasing=False
         )
         
-        # 读取参考图像（如果存在）
+        # Read the reference image, if present
         ref_image_resized = None
         if ref_image_path and os.path.exists(ref_image_path):
             ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
@@ -238,13 +238,13 @@ class MedSAM2_2D_Dataset(Dataset):
                 ) * 255.0
             ref_image_resized = np.clip(ref_image_resized, 0, 255).astype(np.uint8)
         
-        # 从参考mask中提取bounding box
+        # Extract the bounding box from the reference mask
         y_indices, x_indices = np.where(ref_mask_resized > 0.5)
         if len(y_indices) == 0 or len(x_indices) == 0:
-            # 如果参考mask为空，使用当前mask
+            # Fall back to the current mask if the reference mask is empty
             y_indices, x_indices = np.where(mask_resized > 0.5)
             if len(y_indices) == 0 or len(x_indices) == 0:
-                # 如果当前mask也为空，返回一个默认的box
+                # If the current mask is also empty, return a default box
                 x_min, x_max = 0, self.image_size - 1
                 y_min, y_max = 0, self.image_size - 1
             else:
@@ -254,7 +254,7 @@ class MedSAM2_2D_Dataset(Dataset):
             x_min, x_max = np.min(x_indices), np.max(x_indices)
             y_min, y_max = np.min(y_indices), np.max(y_indices)
         
-        # 添加随机扰动
+        # Apply random perturbation
         H, W = self.image_size, self.image_size
         x_min = max(0, x_min - random.randint(0, self.bbox_shift))
         x_max = min(W - 1, x_max + random.randint(0, self.bbox_shift))
@@ -263,29 +263,29 @@ class MedSAM2_2D_Dataset(Dataset):
         
         bbox = np.array([x_min, y_min, x_max, y_max], dtype=np.float32)
         
-        # 转换为PIL Image（用于数据增强和ToTensor）
+        # Convert to PIL Image (used for data augmentation and ToTensor)
         img_pil = Image.fromarray(img_resized, mode='RGB')
         mask_pil = Image.fromarray((mask_resized * 255).astype(np.uint8), mode='L')
         
-        # 处理参考图像和mask(for the TRACE variant)
+        # Handle the reference image and mask (for the TRACE variant)
         ref_img_pil = None
         ref_mask_pil = None
         if ref_image_resized is not None:
             ref_img_pil = Image.fromarray(ref_image_resized, mode='RGB')
             ref_mask_pil = Image.fromarray((ref_mask_resized * 255).astype(np.uint8), mode='L')
         
-        # 数据增强（仅在训练时）
+        # Data augmentation (training only)
         if self.use_augmentation:
             # 1. RandomHorizontalFlip (p=0.5)
             if random.random() < 0.5:
                 img_pil = F.hflip(img_pil)
                 mask_pil = F.hflip(mask_pil)
-                # 对参考图像和mask也应用翻转(for the TRACE variant)
+                # Also flip the reference image and mask (for the TRACE variant)
                 if ref_img_pil is not None:
                     ref_img_pil = F.hflip(ref_img_pil)
                 if ref_mask_pil is not None:
                     ref_mask_pil = F.hflip(ref_mask_pil)
-                # 翻转bbox的x坐标
+                # Flip the bbox x-coordinates
                 W = self.image_size
                 x_min_new = W - 1 - bbox[2]
                 x_max_new = W - 1 - bbox[0]
@@ -293,7 +293,7 @@ class MedSAM2_2D_Dataset(Dataset):
                 bbox[2] = x_max_new
             
             # 2. RandomAffine (degrees=25, shear=20)
-            if random.random() < 1.0:  # 始终应用（p=1.0 in config）
+            if random.random() < 1.0:  # always applied (p=1.0 in config)
                 img_size = [self.image_size, self.image_size]  # [width, height]
                 affine_params = T.RandomAffine.get_params(
                     degrees=[-25, 25],
@@ -303,7 +303,7 @@ class MedSAM2_2D_Dataset(Dataset):
                     img_size=img_size,
                 )
                 
-                # 应用仿射变换到图像和mask
+                # Apply the affine transform to the image and mask
                 img_pil = F.affine(
                     img_pil,
                     *affine_params,
@@ -317,7 +317,7 @@ class MedSAM2_2D_Dataset(Dataset):
                     fill=0
                 )
                 
-                # 对参考图像和mask也应用相同的变换(for the TRACE variant)
+                # Apply the same transform to the reference image and mask (for the TRACE variant)
                 if ref_img_pil is not None:
                     ref_img_pil = F.affine(
                         ref_img_pil,
@@ -333,16 +333,16 @@ class MedSAM2_2D_Dataset(Dataset):
                         fill=0
                     )
                 
-                # 应用仿射变换到bbox
+                # Apply the affine transform to the bbox
                 bbox = self._apply_affine_to_bbox(bbox, affine_params, img_size)
             
-            # 3. ColorJitter (brightness=0.1, contrast=0.03, saturation=0.03, hue=0即不变换色调)
-            if random.random() < 1.0:  # 始终应用
+            # 3. ColorJitter (brightness=0.1, contrast=0.03, saturation=0.03, hue=0 -> no hue change)
+            if random.random() < 1.0:  # always applied
                 color_jitter = T.ColorJitter(
                     brightness=0.1,
                     contrast=0.03,
                     saturation=0.03,
-                    hue=0  # 不变换色调（对应MedSAM2配置中的hue: null）
+                    hue=0  # no hue change (matches MedSAM2's config: hue: null)
                 )
                 img_pil = color_jitter(img_pil)
             
@@ -351,16 +351,16 @@ class MedSAM2_2D_Dataset(Dataset):
                 grayscale = T.Grayscale(num_output_channels=3)
                 img_pil = grayscale(img_pil)
         
-        # 转换为tensor（0-255 -> 0-1）
+        # Convert to tensor (0-255 -> 0-1)
         img_tensor = F.to_tensor(img_pil)  # (3, H, W), float [0, 1]
         
-        # Normalize（ImageNet mean/std，与SAM2Transforms保持一致）
+        # Normalize with ImageNet mean/std (matches SAM2Transforms)
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
         img_tensor = F.normalize(img_tensor, mean=mean, std=std)  # (3, H, W)
         
         # mask: PIL -> tensor -> (1, H, W)
-        # F.to_tensor() 已经自动将0-255的PIL Image转换为0-1的float tensor，不需要再除以255.0
+        # F.to_tensor() already converts the 0-255 PIL Image to a 0-1 float tensor; no need to divide by 255.0
         mask_tensor = F.to_tensor(mask_pil).squeeze(0).float()  # (H, W), float [0, 1]
         mask_tensor = mask_tensor.unsqueeze(0)  # (1, H, W)
         
@@ -374,7 +374,7 @@ class MedSAM2_2D_Dataset(Dataset):
             'img_name': img_name,
         }
         
-        # 添加参考图像和mask（for the TRACE variant）
+        # Add the reference image and mask (for the TRACE variant)
         if ref_img_pil is not None:
             ref_img_tensor = F.to_tensor(ref_img_pil)  # (3, H, W), float [0, 1]
             ref_img_tensor = F.normalize(ref_img_tensor, mean=mean, std=std)  # (3, H, W)
@@ -383,6 +383,6 @@ class MedSAM2_2D_Dataset(Dataset):
         if ref_mask_pil is not None:
             ref_mask_tensor = F.to_tensor(ref_mask_pil).squeeze(0).float()  # (H, W), float [0, 1]
             ref_mask_tensor = ref_mask_tensor.unsqueeze(0)  # (1, H, W)
-            result['ref_gt'] = ref_mask_tensor  # ref_mask_resized 就是 ref_gt
+            result['ref_gt'] = ref_mask_tensor  # ref_mask_resized is the ref_gt
         
         return result

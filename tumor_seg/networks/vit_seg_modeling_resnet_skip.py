@@ -379,13 +379,13 @@ class DeltaProduct(nn.Module):
 
 
 # =========================
-# 新增：Global Tokens Cross-Attention（第四个 mode）
+# New: Global Tokens Cross-Attention (the fourth mode)
 # =========================
 
 class XAttnGlobalTokens(nn.Module):
     """
-    轻量跨分支交互：Q 为自身全分辨率；K/V 为对方池化得到的 tokens。
-    双向：t<-r 和 r<-t；输出形状保持 (B,C,H,W) 不变。
+    Lightweight cross-branch interaction: Q comes from the local full-resolution branch; K/V are tokens pooled from the other branch.
+    Bidirectional: t<-r and r<-t. Output shape stays (B,C,H,W).
     """
     def __init__(self, c, heads=4, red=2, pool_stride=4):
         super().__init__()
@@ -447,7 +447,7 @@ class XAttnTokensConv(nn.Module):
     Cross-Attention with learnable tokenization for K/V:
       - Q: self, full-res (B, Cr, H, W)
       - K,V: other, via Conv2d(kernel=ks, stride=s, padding=p)  -> (B, Cr, H', W')
-    设置 stride=1 即可不做任何空间降采样（K/V 与 Q 同分辨率）。
+    Set stride=1 to disable spatial downsampling (K/V at the same resolution as Q).
     """
     def __init__(self, c, heads=4, red=2, kv_stride=4, kv_kernel=3, kv_padding=1):
         super().__init__()
@@ -492,8 +492,8 @@ class XAttnTokensConv(nn.Module):
     def forward(self, t, r):
         # t <- r
         q_t = self.q_t(t)                 # (B,Cr,H,W)
-        k_r = self.k_r(r)                 # (B,Cr,H',W')，当 stride=1 时 H'=H
-        v_r = self.v_r(r)                 # 同上
+        k_r = self.k_r(r)                 # (B,Cr,H',W'); H'=H when stride=1
+        v_r = self.v_r(r)                 # same as above
         dt  = self._attn_once(q_t, k_r, v_r)
         t_new = t + self.o_t(dt)
 
@@ -511,27 +511,27 @@ class XAttnTokensConv(nn.Module):
 
 class MLPInteractor(nn.Module):
     """
-    纯 MLP 跨分支交互（baseline）:
-      - 输入: t, r ∈ R^{B×C×H×W}
-      - 拼接特征: concat([t, r, t-r, t*r], dim=1)  (可配 use_pairwise=False 则只用 [t,r])
-      - 两个 1×1 conv + GELU 的 MLP，分别回归 Δt, Δr
-      - 残差更新: t' = t + γ·Δt, r' = r + γ·Δr
-    形状保持不变。
+    Pure-MLP cross-branch interaction (baseline):
+      - Input: t, r ∈ R^{B x C x H x W}
+      - Concatenated features: concat([t, r, t-r, t*r], dim=1) (set use_pairwise=False to keep only [t, r])
+      - Two 1x1-conv + GELU MLPs that regress Δt and Δr separately
+      - Residual update: t' = t + γ * Δt, r' = r + γ * Δr
+    Shape is unchanged.
     """
     def __init__(self, c, hidden_mul=2, use_pairwise=True, norm='gn', res_scale=0.1):
         super().__init__()
         self.use_pairwise = use_pairwise
-        in_ch = 2 * c if not use_pairwise else 4 * c          # [t, r] 或 [t, r, t-r, t*r]
+        in_ch = 2 * c if not use_pairwise else 4 * c          # [t, r] or [t, r, t-r, t*r]
         hidden = max(int(hidden_mul * c), c)
 
         Norm = nn.Identity
         if norm == 'bn':
             Norm = lambda cc: nn.BatchNorm2d(cc)
         elif norm == 'gn':
-            # 与你主干一致，避免 BN 对 batch size 的依赖
+            # Match the trunk and avoid the BN dependency on batch size
             Norm = lambda cc: nn.GroupNorm(num_groups=min(32, cc), num_channels=cc, eps=1e-6)
 
-        # 用“共享的特征抽取” + “分支专属的头” 更干净
+        # 'Shared feature extractor' + 'branch-specific heads' is cleaner
         self.trunk = nn.Sequential(
             nn.Conv2d(in_ch, hidden, kernel_size=1, bias=False),
             Norm(hidden),
@@ -544,7 +544,7 @@ class MLPInteractor(nn.Module):
             nn.Conv2d(hidden, c, kernel_size=1, bias=True)
         )
 
-        # 可学习残差缩放，默认 0.1 更稳定
+        # Learnable residual scaling; default 0.1 is more stable
         self.res_scale_t = nn.Parameter(torch.tensor(res_scale, dtype=torch.float32))
         self.res_scale_r = nn.Parameter(torch.tensor(res_scale, dtype=torch.float32))
 
@@ -569,16 +569,16 @@ import torch.nn.functional as F
 
 class QueryCrossAttn(nn.Module):
     """
-    Object-Query Cross-Attention (双向):
-      Stage1: learned queries (per-head) 从对方分支提取 M 个上下文 token
-      Stage2: 用当前分支的像素查询与 token 再做注意力，把语义撒回像素
-    形状保持不变: (t,r)->(t',r'), 均为 (B,C,H,W)
+    Object-Query Cross-Attention (bidirectional):
+      Stage 1: learned queries (per-head) extract M context tokens from the other branch
+      Stage 2: pixel queries from the current branch attend to the tokens to broadcast semantics back to pixels
+    Shape is unchanged: (t, r) -> (t', r'), both (B, C, H, W)
     """
     def __init__(self, c, n_queries=64, heads=4, red=2,
                  kv_stride=4, kv_kernel=3, kv_padding=1,
                  share_queries=False, res_scale=0.1):
         super().__init__()
-        assert (c // red) % heads == 0, "C//red 必须能被 heads 整除"
+        assert (c // red) % heads == 0, "C // red must be divisible by heads"
         self.h  = heads
         self.M  = n_queries
         self.red = red
@@ -588,7 +588,7 @@ class QueryCrossAttn(nn.Module):
         d  = Cr // heads
         self.Cr, self.d = Cr, d
 
-        # --- K/V 生成（对方分支） ---
+        # --- K/V (from the other branch) ---
         # t <- r
         self.k_r = nn.Conv2d(c, Cr, kv_kernel, stride=kv_stride, padding=kv_padding, bias=False)
         self.v_r = nn.Conv2d(c, Cr, kv_kernel, stride=kv_stride, padding=kv_padding, bias=False)
@@ -596,27 +596,27 @@ class QueryCrossAttn(nn.Module):
         self.k_t = nn.Conv2d(c, Cr, kv_kernel, stride=kv_stride, padding=kv_padding, bias=False)
         self.v_t = nn.Conv2d(c, Cr, kv_kernel, stride=kv_stride, padding=kv_padding, bias=False)
 
-        # --- Stage2 的像素查询（当前分支） ---
+        # --- Stage 2 pixel queries (current branch) ---
         self.qpix_t = nn.Conv2d(c, Cr, 1, bias=False)  # for t pixels
         self.qpix_r = nn.Conv2d(c, Cr, 1, bias=False)  # for r pixels
 
-        # --- learned queries（Stage1 的 Q_learned）---
-        # 形状: (1, h, M, d)，按 batch 广播
+        # --- learned queries (Stage 1's Q_learned) ---
+        # Shape: (1, h, M, d), broadcast across the batch
         if share_queries:
             self.q_tok = nn.Parameter(torch.randn(1, heads, n_queries, d) * 0.02)
             self.q_tok_t = self.q_tok
             self.q_tok_r = self.q_tok
         else:
-            self.q_tok_t = nn.Parameter(torch.randn(1, heads, n_queries, d) * 0.02)  # 用于 t<-r
-            self.q_tok_r = nn.Parameter(torch.randn(1, heads, n_queries, d) * 0.02)  # 用于 r<-t
+            self.q_tok_t = nn.Parameter(torch.randn(1, heads, n_queries, d) * 0.02)  # for t<-r
+            self.q_tok_r = nn.Parameter(torch.randn(1, heads, n_queries, d) * 0.02)  # for r<-t
 
-        # --- 输出投影 + 残差缩放 ---
+        # --- Output projection + residual scaling ---
         self.proj_t = nn.Conv2d(Cr, c, 1, bias=False)
         self.proj_r = nn.Conv2d(Cr, c, 1, bias=False)
         self.res_scale_t = nn.Parameter(torch.tensor(res_scale, dtype=torch.float32))
         self.res_scale_r = nn.Parameter(torch.tensor(res_scale, dtype=torch.float32))
 
-        # 可选：轻量 FFN（深度可分离卷积 + PW）
+        # Optional: lightweight FFN (depthwise separable conv + pointwise)
         self.ffn_t = nn.Sequential(
             nn.Conv2d(c, c, 3, padding=1, groups=c, bias=False), nn.ReLU(inplace=True),
             nn.Conv2d(c, c, 1, bias=True)
@@ -628,10 +628,10 @@ class QueryCrossAttn(nn.Module):
 
     def _stage1_tokens(self, q_tok, k_feat, v_feat):
         """
-        Stage1: learned queries 从对方分支读出 M 个 token
+        Stage 1: learned queries read M tokens from the other branch.
         q_tok: (1,h,M,d)
         k_feat/v_feat: (B,Cr,H',W') -> (B,h,Nk,d)
-        返回 tokens: (B,h,M,d)
+        Returns tokens: (B, h, M, d)
         """
         B, Cr, Hp, Wp = k_feat.shape
         h, d = self.h, self.d
@@ -640,7 +640,7 @@ class QueryCrossAttn(nn.Module):
         K = k_feat.reshape(B, h, d, Nk).permute(0,1,3,2)  # (B,h,Nk,d)
         V = v_feat.reshape(B, h, d, Nk).permute(0,1,3,2)  # (B,h,Nk,d)
 
-        # 扩展 learned queries 到 batch
+        # Broadcast learned queries to the batch
         Q = q_tok.expand(B, -1, -1, -1)                   # (B,h,M,d)
 
         attn = (Q @ K.transpose(-2, -1)) / (d ** 0.5)     # (B,h,M,Nk)
@@ -650,10 +650,10 @@ class QueryCrossAttn(nn.Module):
 
     def _stage2_broadcast(self, qpix, tokens):
         """
-        Stage2: 像素查询与 tokens 再 attention，广播回像素
+        Stage 2: pixel queries attend to the tokens, broadcasting back to pixels.
         qpix:   (B,Cr,H,W) -> (B,h,Nq,d)
         tokens: (B,h,M,d)
-        返回 out: (B,Cr,H,W)
+        Returns out: (B, Cr, H, W)
         """
         B, Cr, H, W = qpix.shape
         h, d = self.h, self.d
@@ -670,14 +670,14 @@ class QueryCrossAttn(nn.Module):
 
     def _one_dir(self, src, other, q_tok, k_other, v_other, qpix_src, proj_out, res_scale, ffn):
         """
-        单向: src <- other
+        One-way: src <- other
         """
-        # Stage1: learned queries 读取对方 tokens
+        # Stage 1: learned queries read tokens from the other branch
         tokens = self._stage1_tokens(q_tok, k_other, v_other)  # (B,h,M,d)
-        # Stage2: 像素 attention 撒回像素
+        # Stage 2: pixel attention broadcasts back to pixels
         qpix = qpix_src(src)                                   # (B,Cr,H,W)
         out  = self._stage2_broadcast(qpix, tokens)            # (B,Cr,H,W)
-        # 残差 + 轻量 FFN
+        # Residual + lightweight FFN
         src2 = src + res_scale * proj_out(out)                 # (B,C,H,W)
         src2 = src2 + ffn(src2)
         return src2
@@ -706,7 +706,7 @@ class QueryCrossAttn(nn.Module):
 def make_interactor(mode: str, c: int, **kwargs):
     mode = (mode or "none").lower()
 
-    # 通用默认
+    # Generic defaults
     heads   = kwargs.get("heads", 4)
     red     = kwargs.get("red", 2)
 
@@ -718,12 +718,12 @@ def make_interactor(mode: str, c: int, **kwargs):
         return DeltaProduct(c)
 
     elif mode == "xattn_global":
-        # K/V token 用 avgpool 的版本
+        # K/V tokens via average pooling
         pool_stride = kwargs.get("pool_stride", 4)
         return XAttnGlobalTokens(c, heads=heads, red=red, pool_stride=pool_stride)
 
     elif mode == "xattn_tokens_conv":
-        # K/V token 用可学习卷积的版本（可 kv_stride=1）
+        # K/V tokens via a learnable conv (kv_stride=1 is allowed)
         kv_stride = kwargs.get("kv_stride", 4)
         kv_kernel = kwargs.get("kv_kernel", 3)
         kv_padding= kwargs.get("kv_padding", 1)
@@ -740,7 +740,7 @@ def make_interactor(mode: str, c: int, **kwargs):
                                         ffn_expand=ffn_expand)
 
     elif mode == "xattn_query":
-        # ★ 关键：此处读取 query_tokens 等参数；没有就走默认
+        # IMPORTANT: read query_tokens and friends here; fall back to defaults if absent
         n_queries   = kwargs.get("query_tokens", 64)
         kv_stride   = kwargs.get("kv_stride", 4)
         kv_kernel   = kwargs.get("kv_kernel", 3)
@@ -778,10 +778,10 @@ class DualEncoderWithInteraction(nn.Module):
     def __init__(self, cfg,
                  mode="crossse",
                  use_on=("b1","b2"),
-                 strides=None,              # 仅 xattn_global 使用
+                 strides=None,              # only used by xattn_global
                  heads=4, red=2,
                  kv_strides=None, kv_kernel=3, kv_padding=1,
-                 interactor_kwargs: dict = None):   # ★ 新增
+                 interactor_kwargs: dict = None):   # NEW
         super().__init__()
         self.tar_backbone = ResNetV4(block_units=cfg.resnet.num_layers, width_factor=cfg.resnet.width_factor)
         self.ref_backbone = ResNetV2(block_units=cfg.resnet.num_layers, width_factor=cfg.resnet.width_factor)
@@ -797,7 +797,7 @@ class DualEncoderWithInteraction(nn.Module):
 
         strides    = strides or {"root":8, "b1":4, "b2":2}
         kv_strides = kv_strides or {"root":8, "b1":4, "b2":2}
-        interactor_kwargs = dict(interactor_kwargs or {})  # 复制一份，避免原地修改
+        interactor_kwargs = dict(interactor_kwargs or {})  # copy to avoid in-place mutation
 
         # root
         if self.use_root:
@@ -859,7 +859,7 @@ class DualEncoderWithInteraction(nn.Module):
         t = self.tar_backbone.root(target_2ch)      # (B,64,112,112)
         r = self.ref_backbone.root(reference_3ch)   # (B,64,112,112)
         if self.xfer_root is not None:
-            t, r = self.xfer_root(t, r)            # 交互(112×112)
+            t, r = self.xfer_root(t, r)            # interaction (112x112)
         feat_root_t = t
         feat_root_r = r
 
@@ -874,7 +874,7 @@ class DualEncoderWithInteraction(nn.Module):
         feat_b1_t = self._align_to(b1_t, right_size_b1)       # (B,256,56,56)
         feat_b1_r = self._align_to(b1_r, right_size_b1)
         if self.xfer_b1 is not None:
-            feat_b1_t, feat_b1_r = self.xfer_b1(feat_b1_t, feat_b1_r)   # 交互(56×56)
+            feat_b1_t, feat_b1_r = self.xfer_b1(feat_b1_t, feat_b1_r)   # interaction (56x56)
 
         # ----- block2 -----
         b2_t = self.tar_backbone.body._modules['block2'](feat_b1_t)     # ~ (B,512,27,27)
@@ -883,9 +883,9 @@ class DualEncoderWithInteraction(nn.Module):
         feat_b2_t = self._align_to(b2_t, right_size_b2)                 # (B,512,28,28)
         feat_b2_r = self._align_to(b2_r, right_size_b2)
         if self.xfer_b2 is not None:
-            feat_b2_t, feat_b2_r = self.xfer_b2(feat_b2_t, feat_b2_r)   # 交互(28×28)
+            feat_b2_t, feat_b2_r = self.xfer_b2(feat_b2_t, feat_b2_r)   # interaction (28x28)
 
-        # ----- block3 （主干输出）-----
+        # ----- block3 (trunk output) -----
         x_tar = self.tar_backbone.body._modules['block3'](feat_b2_t)    # ~ (B,1024,13/14,13/14)
         x_ref = self.ref_backbone.body._modules['block3'](feat_b2_r)
 

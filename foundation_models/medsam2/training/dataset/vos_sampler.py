@@ -99,8 +99,8 @@ class MiddleAnchoredSampler(VOSSampler):
     50% reverse: middle, middle-1, ..., middle-T+1). If one side has fewer
     than `num_frames - 1` slices, we fall back to the other direction.
 
-    This matches the test-time protocol of `test_medsam2_2d_video.py`, which
-    splits the volume at middle and runs the same box prompt forward and
+    This matches the test-time protocol used at evaluation, which splits the
+    volume at the middle slice and runs the same box prompt forward and
     backward. `reverse_time_prob` from RandomUniformSampler is intentionally
     replaced by the direction-random logic here.
     """

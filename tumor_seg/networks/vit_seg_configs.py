@@ -133,21 +133,21 @@ def get_h14_config():
 
 #csp added, for smaller segmentation
 def get_r18_s16_config():
-    """Returns the ResNet18 + ViT‑S/16 configuration (轻量级混合骨干)."""
-    config = get_s16_config()                     # 先继承小型 ViT 配置
-    config.patches.grid = (16, 16)                # 对应 ViT patch grid
+    """Returns the ResNet18 + ViT‑S/16 configuration (lightweight hybrid backbone)."""
+    config = get_s16_config()                     # Inherit the small ViT config
+    config.patches.grid = (16, 16)                # Matches the ViT patch grid
 
-    # ResNet‑18 主干参数
+    # ResNet-18 backbone parameters
     config.resnet = ml_collections.ConfigDict()
     config.resnet.num_layers = (2, 2, 2)          # conv2_x, conv3_x, conv4_x
     config.resnet.width_factor = 1
 
-    # 其他分割相关超参
+    # Other segmentation-related hyperparameters
     config.classifier = 'seg'
     config.pretrained_path = \
         '../model/vit_checkpoint/imagenet21k/R18+ViT-S_16.npz'
-    # config.decoder_channels = (128, 64, 32, 16)   # 解码器缩小
-    # config.skip_channels   = [256, 128, 64, 16]   # 与 ResNet‑18 输出对应
+    # config.decoder_channels = (128, 64, 32, 16)   # Smaller decoder
+    # config.skip_channels   = [256, 128, 64, 16]   # Matches ResNet-18 outputs
     config.decoder_channels = (256, 128, 64, 16)
     config.skip_channels = [512, 256, 64, 16]
     config.n_classes = 2
@@ -158,20 +158,20 @@ def get_r18_s16_config():
 
 
 def get_s16_config():
-    """Returns the ViT‑S/16 configuration (轻量级纯 ViT)."""
+    """Returns the ViT‑S/16 configuration (lightweight pure ViT)."""
     config = ml_collections.ConfigDict()
 
-    # ViT‑S/16 主干
+    # ViT-S/16 backbone
     config.patches   = ml_collections.ConfigDict({'size': (16, 16)})
     config.hidden_size = 384
     config.transformer = ml_collections.ConfigDict()
     config.transformer.mlp_dim   = 1536
     config.transformer.num_heads = 6
-    config.transformer.num_layers = 8             # 也可设 12；此处进一步减参
+    config.transformer.num_layers = 8             # 12 also works; we shrink further here
     config.transformer.attention_dropout_rate = 0.0
     config.transformer.dropout_rate            = 0.1
 
-    # 任务相关
+    # Task-specific settings
     config.classifier           = 'seg'
     config.representation_size  = None
     config.resnet_pretrained_path = None
@@ -179,7 +179,7 @@ def get_s16_config():
         '../model/vit_checkpoint/imagenet21k/ViT-S_16.npz'
     config.patch_size = 16
 
-    # U‑Net 风格解码器
+    # U-Net style decoder
     config.decoder_channels = (128, 64, 32, 16)
     config.n_classes = 2
     config.activation = 'softmax'

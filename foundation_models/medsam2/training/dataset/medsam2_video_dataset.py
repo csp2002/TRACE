@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
 MedSAM2 Video training dataset（for the TRACE variant）
-将2D数据组织为video格式：每个病人的所有slice作为一个video
-使用middle slice的GT作为reference
+Reorganize 2D data into video format: all slices of one patient form one video.
+Use the middle slice's GT as the reference.
 """
 
 import os
@@ -19,14 +19,14 @@ from training.dataset.vos_raw_dataset import VOSRawDataset, VOSFrame, VOSVideo
 class MedSAM2VideoSegmentLoader:
     """
     Segment loader for MedSAM2 video dataset
-    每个病人的所有slice的mask
+    All slice masks for one patient.
     """
     def __init__(self, mask_paths: List[str]):
         """
         Args:
             mask_paths: list of mask file paths for all slices of a patient
         """
-        self.mask_paths = sorted(mask_paths)  # 确保顺序一致
+        self.mask_paths = sorted(mask_paths)  # keep ordering stable
     
     def load(self, frame_idx, obj_ids=None):
         """
@@ -47,7 +47,7 @@ class MedSAM2VideoSegmentLoader:
         # Load mask (assume binary mask, 0=background, 255=foreground)
         mask = io.imread(mask_path)
         if len(mask.shape) == 3:
-            mask = mask[:, :, 0]  # 取第一个通道
+            mask = mask[:, :, 0]  # take the first channel
         
         # Convert to binary (0 or 1)
         mask_binary = (mask > 127).astype(np.uint8)
@@ -62,8 +62,8 @@ class MedSAM2VideoSegmentLoader:
 class MedSAM2VideoRawDataset(VOSRawDataset):
     """
     Video dataset for MedSAM2 + TRACE
-    将2D数据组织为video格式：每个病人的所有slice作为一个video
-    每个slice作为一个frame
+    Reorganize 2D data into video format: all slices of one patient form one video.
+    Each slice becomes one frame.
     """
     def __init__(
         self,
@@ -73,16 +73,16 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
     ):
         """
         Args:
-            base_dir: 数据集根目录，例如 './2D_data/colon'
-            mode: 'train' 或 'test'
-            image_size: 图像尺寸（用于resize）
+            base_dir: dataset root, e.g. './2D_data/colon'
+            mode: 'train' or 'test'
+            image_size: model input size (used for resizing)
         """
         self.base_dir = base_dir
         self.dataset_name = os.path.basename(base_dir.rstrip('/'))
         self.mode = mode
         self.image_size = image_size
         
-        # 加载middle slice的annotation字典
+        # Load the middle-slice annotation dict
         dict_path = os.path.join(self.base_dir, self.mode, "annotation_dict_middle.json")
         self.ref_map = {}
         if os.path.exists(dict_path):
@@ -92,13 +92,13 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
         else:
             print(f"[WARN] Middle annotation dict not found: {dict_path}")
         
-        # 获取所有病人的数据
+        # Collect data for every patient
         self.patient_videos = self._organize_patient_videos()
         print(f"[INFO] Found {len(self.patient_videos)} patient videos in {mode} set")
     
     def _organize_patient_videos(self) -> List[Dict]:
         """
-        组织病人的数据：每个病人的所有slice作为一个video
+        Organize one patient's data: all slices form one video.
         
         Returns:
             List of dicts, each dict contains:
@@ -116,13 +116,13 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
         patient_videos = []
         video_id = 0
         
-        # 遍历所有病人文件夹
+        # Iterate over every patient folder
         for patient_folder in sorted(os.listdir(ct_dir)):
             patient_ct_folder = os.path.join(ct_dir, patient_folder)
             if not os.path.isdir(patient_ct_folder):
                 continue
             
-            # 获取该病人的所有slice
+            # Collect all slices for this patient
             image_paths = []
             mask_paths = []
             
@@ -136,12 +136,12 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
                     image_paths.append(ct_path)
                     mask_paths.append(mask_path)
             
-            # 至少需要2个slice才能组成video
+            # Need at least 2 slices to form a video
             if len(image_paths) < 2:
                 print(f"[WARN] Patient {patient_folder} has less than 2 slices, skipping")
                 continue
             
-            # 获取middle slice的路径（从annotation_dict_middle.json）
+            # Resolve the middle-slice path (from annotation_dict_middle.json)
             patient_name = patient_folder
             ref_image_path = None
             ref_mask_path = None
@@ -153,7 +153,7 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
                     if ref_mask_path:
                         ref_image_path = ref_mask_path.replace('Mask', 'CT')
             
-            # 如果没有找到middle slice，使用中间位置作为middle slice
+            # If no middle slice was found, fall back to the geometric centre of the volume
             if ref_image_path is None or not os.path.exists(ref_image_path):
                 middle_idx = len(image_paths) // 2
                 ref_image_path = image_paths[middle_idx]
@@ -174,7 +174,7 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
     
     def get_video(self, idx: int):
         """
-        获取一个video（病人的所有slice）
+        Get one video (all slices for a patient).
         
         Args:
             idx: video index (patient index)
@@ -188,30 +188,30 @@ class MedSAM2VideoRawDataset(VOSRawDataset):
         
         video_info = self.patient_videos[idx]
         
-        # 创建VOSFrame列表
+        # Build the VOSFrame list
         frames = []
         for frame_idx, image_path in enumerate(video_info['image_paths']):
             frames.append(VOSFrame(
                 frame_idx=frame_idx,
                 image_path=image_path,
-                data=None,  # 将在transforms中加载
+                data=None,  # loaded in the transforms pipeline
             ))
         
-        # 创建VOSVideo对象
+        # Build the VOSVideo object
         video = VOSVideo(
             video_name=video_info['patient_name'],
             video_id=video_info['video_id'],
             frames=frames,
         )
         
-        # 创建SegmentLoader
+        # Build the SegmentLoader
         segment_loader = MedSAM2VideoSegmentLoader(video_info['mask_paths'])
         
         return video, segment_loader
     
     def get_ref_image_mask(self, idx: int):
         """
-        获取reference image和mask（middle slice）
+        Get the reference image and mask (middle slice).
         
         Args:
             idx: video index (patient index)

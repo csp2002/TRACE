@@ -91,7 +91,7 @@ class MedFormer_ours(nn.Module):
         logits_ref = self.medformer(x_ref)  #bs,2,224,224
 
         probs = torch.softmax(logits, dim=1)  # (bs, 2, 224, 224)
-        ori_mask = probs[:, 1:2, :, :]        # 取出“前景”类别的概率，仍保持 shape 为 (bs, 1, 224, 224)
+        ori_mask = probs[:, 1:2, :, :]        # Extract the 'foreground' class probability; shape stays (bs, 1, 224, 224)
 
         probs_ref = torch.softmax(logits_ref, dim=1)
         ref_mask = probs_ref[:, 1:2, :, :]  # (bs, 1, 224, 224)
@@ -111,15 +111,15 @@ class MedFormer_ours(nn.Module):
         preds_all.append(final_pred)
 
         for it in range(1, max(1, self.refine_iters) ):
-        # 把上一轮的输出变成下一轮的 target prediction
+        # Feed the previous iteration's output as the next iteration's target prediction
             next_mask = torch.softmax(final_pred, dim=1)[:, 1:2]   
 
             if self.detach_between_iters:
                 next_mask = next_mask.detach()
 
             target_2ch = torch.cat([x, next_mask], dim=1)      # (B,2,H,W)
-            # reference 一般保持不变；如果你希望同步更新 ref_pred，也可以把 ref_mask 改成 logits_ref 的迭代版
-            # 这里保持 ref_3ch 不变：
+            # Reference typically stays unchanged; if you want to update ref_pred too, swap ref_mask for the iterated logits_ref
+            # Keep ref_3ch unchanged here:
             # ref_3ch = torch.cat([ref_image_raw, ref_mask, ref_gt], dim=1)
 
             final_pred = self.refinement_module(target_2ch, ref_image)
