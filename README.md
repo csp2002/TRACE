@@ -59,11 +59,13 @@ python -m tumor_seg.train --exp_name transunet --dataset kits
 python -m tumor_seg.train --exp_name transunet_ours --dataset kits
 ```
 
-The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list (`medformer`, `attention_unet`, `unetpp`, `swin_unet`, `FAT_Net`, `H2Former` — each with an `_ours` counterpart). Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
+The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list. 
+
+Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
 
 Trained checkpoints are written to `./checkpoints/<exp_subdir>/...`; the test and simulation drivers below load from the same location.
 
-### 4.2 Test (per-slice Dice and IoU)
+### 4.2 Test
 
 ```bash
 # Baseline TransUNet on KiTS test set
@@ -88,7 +90,7 @@ python -m tumor_seg.simulation \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
 
-For each slice in the test volume the AI's prediction is compared against the clinician's ground truth at the chosen Dice threshold; if the metric falls below the threshold the slice is "rejected" and the clinician corrects it, otherwise it is "accepted" as-is. The driver sweeps the threshold list and computes the rejection rate under two AI modes — Mode A is the baseline model alone (no reference), Mode B is the same baseline plus TRACE conditioned per slice on the previous slice's mask (the AI prediction if that slice was accepted, otherwise the clinician's correction) — and writes a JSON curve. Both modes use AI; the comparison isolates the effect of TRACE.
+Each slice's AI prediction is checked against GT at the Dice threshold: below threshold the clinician corrects it ("rejected"), otherwise it is "accepted". The driver sweeps thresholds and reports the rejection rate for **Mode A** (baseline alone) vs **Mode B** (baseline + TRACE).
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 
@@ -98,7 +100,7 @@ A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface 
 python -m tumor_seg.edit_workload --model_name TransUNet
 ```
 
-Compares per-slice edit effort between two AI modes: Mode A uses the baseline model only, Mode B uses the same baseline plus TRACE conditioned on the neighbor reference. Reports FN-rate, FP-rate, Hausdorff-95 and Dice-difference between the AI prediction and the clinician's ground truth, so the gap measures the editing the clinician would do. Both modes use AI; the comparison isolates the effect of TRACE.
+Compares per-slice edit effort (treat every slice as 'rejected') between **Mode A** (baseline alone) and **Mode B** (baseline + TRACE with neighbor reference) via FN-rate, FP-rate, HD-95 and Dice-difference between the AI prediction and GT.
 
 ## 5. Acknowledgements
 
