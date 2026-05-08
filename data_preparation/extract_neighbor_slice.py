@@ -29,8 +29,9 @@ def list_image_files(folder: str) -> List[str]:
     )
 
 
-def choose_ref_index_v6_5(idx: int, n: int) -> int:
-    # exact v6_5 logic
+def choose_neighbor_ref_index(idx: int, n: int) -> int:
+    # Slices in the upper half take their next neighbor as reference; slices
+    # in the lower half take their previous neighbor. Boundary slices clamp.
     if idx < n // 2:
         return min(idx + 1, n - 1)
     else:
@@ -57,7 +58,7 @@ def process_split_neighbor_strict(root: str, dataset: str, split: str) -> Dict[s
     """
     Strict mode:
       - Require every CT slice to have a corresponding mask file with SAME filename under Mask/.
-      - Build per-slice neighbor reference mapping using v6_5 rule.
+      - Build per-slice neighbor reference mapping.
       - If any mask is missing -> raise error (stop immediately).
     """
     split_dir = os.path.join(root, dataset, split)
@@ -108,7 +109,7 @@ def process_split_neighbor_strict(root: str, dataset: str, split: str) -> Dict[s
             ct_path = os.path.abspath(os.path.join(patient_ct_dir, fname))
             mask_path = os.path.abspath(os.path.join(patient_mask_dir, fname))
 
-            ref_idx = choose_ref_index_v6_5(idx, n)
+            ref_idx = choose_neighbor_ref_index(idx, n)
             ref_fname = ct_files[ref_idx]
             ref_ct_path = os.path.abspath(os.path.join(patient_ct_dir, ref_fname))
             ref_mask_path = os.path.abspath(os.path.join(patient_mask_dir, ref_fname))
@@ -154,7 +155,7 @@ def auto_detect_datasets(root: str) -> List[str]:
 def main():
     import argparse
 
-    ap = argparse.ArgumentParser(description="Build STRICT neighbor-slice JSONs (v6_5 rule).")
+    ap = argparse.ArgumentParser(description="Build STRICT neighbor-slice JSONs.")
     ap.add_argument("--root", type=str, default="./2D_data",
                     help="Base root, e.g., ./2D_data")
     ap.add_argument("--datasets", type=str, default="",

@@ -21,7 +21,7 @@ import shutil
 import json
 import matplotlib.pyplot as plt
 
-# 添加MedSAM2目录到路径
+# Add the MedSAM2 directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2
@@ -30,7 +30,7 @@ from training.loss_fns import dice_loss, sigmoid_focal_loss
 from training.model.medsam2_with_trace import MedSAM2_with_TRACE
 from training.model.trace import TRACE
 
-# 设置随机种子
+# Seed RNGs
 torch.manual_seed(2023)
 np.random.seed(2023)
 random.seed(2023)
@@ -40,14 +40,14 @@ if torch.cuda.is_available():
 
 def forward_with_box(model, images, boxes, image_size=512, multimask_output=True):
     """
-    使用box prompt进行前向传播（直接调用模型的内部方法）
+    Forward pass with a box prompt (calls the model's internal methods directly).
     
     Args:
-        model: MedSAM2模型
-        images: (B, 3, H, W) 图像tensor，已归一化（ImageNet mean/std）
-        boxes: (B, 4) box坐标 [x_min, y_min, x_max, y_max]，在image_size尺度下
-        image_size: 图像尺寸
-        multimask_output: 是否输出多个mask
+        model: MedSAM2 model
+        images: (B, 3, H, W) image tensor, ImageNet-normalized
+        boxes: (B, 4) box coordinates [x_min, y_min, x_max, y_max] in image_size scale
+        image_size: model input size
+        multimask_output: whether to emit multiple masks
     
     Returns:
         high_res_multimasks, ious, low_res_masks, high_res_masks
@@ -55,21 +55,21 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
     B = images.shape[0]
     device = images.device
     
-    # 1. 获取图像特征
+    # 1. Get image features
     backbone_out = model.forward_image(images)
     _, vision_feats, vision_pos_embeds, feat_sizes = model._prepare_backbone_features(backbone_out)
     
-    # 2. 准备backbone_features（用于_forward_sam_heads）
-    # vision_feats[-1]的格式是 (HW, B, C)，需要转换为 (B, C, H, W)
+    # 2. Prepare backbone_features (consumed by _forward_sam_heads)
+    # vision_feats[-1] is (HW, B, C); reshape to (B, C, H, W)
     H, W = feat_sizes[-1]
     C = model.hidden_dim
     # vision_feats[-1]: (HW, B, C) -> (B, C, H, W)
     backbone_features = vision_feats[-1].permute(1, 2, 0).view(B, C, H, W)  # (B, C, H, W)
     
-    # 3. 准备high-res features（如果需要）
+    # 3. Prepare high-res features (if needed)
     if model.use_high_res_features_in_sam and len(vision_feats) > 1:
         # vision_feats[i]: (HW, B, C) -> (B, C, H, W)
-        # 参考_track_step中的实现
+        # See the implementation in _track_step
         high_res_features = [
             vision_feats[i].permute(1, 2, 0).view(vision_feats[i].size(1), vision_feats[i].size(2), *feat_sizes[i])
             for i in range(len(vision_feats) - 1)
@@ -77,22 +77,22 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
     else:
         high_res_features = None
     
-    # 4. 准备box prompt
-    # boxes格式: [x_min, y_min, x_max, y_max]
-    # prompt_encoder期望的boxes格式是 (B, 2, 2): [[x_min, y_min], [x_max, y_max]]
+    # 4. Prepare the box prompt
+    # boxes layout: [x_min, y_min, x_max, y_max]
+    # prompt_encoder expects boxes shaped (B, 2, 2): [[x_min, y_min], [x_max, y_max]]
     boxes_torch = torch.as_tensor(boxes, dtype=torch.float32, device=device)
     if boxes_torch.dim() == 2 and boxes_torch.shape[1] == 4:
         boxes_torch = boxes_torch.reshape(B, 2, 2)  # (B, 2, 2)
     
-    # 5. 调用prompt encoder（传入boxes）
-    # points可以直接传入None，prompt_encoder内部会处理
+    # 5. Call the prompt encoder (pass boxes)
+    # points can be None; prompt_encoder handles that internally
     sparse_embeddings, dense_embeddings = model.sam_prompt_encoder(
-        points=None,  # 没有point prompt
-        boxes=boxes_torch,  # 传入boxes
+        points=None,  # no point prompt
+        boxes=boxes_torch,  # pass boxes
         masks=None,
     )
     
-    # 6. 调用mask decoder
+    # 6. Call the mask decoder
     (
         low_res_multimasks,
         ious,
@@ -110,7 +110,7 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
 
     
 
-    # 7. 处理object scores（如果需要）
+    # 7. Handle object scores (if needed)
     if model.pred_obj_scores:
     #     print("pred_obj_scores:", model.pred_obj_scores,
     #   "obj_logit mean/min/max:",
@@ -126,7 +126,7 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
             torch.tensor(NO_OBJ_SCORE, device=device, dtype=low_res_multimasks.dtype),
         )
     
-    # 8. 上采样到原始图像尺寸
+    # 8. Upsample to the original image size
     low_res_multimasks = low_res_multimasks.float()
     high_res_multimasks = F.interpolate(
         low_res_multimasks,
@@ -135,7 +135,7 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
         align_corners=False,
     )
     
-    # 9. 选择最佳mask（如果multimask_output=True）
+    # 9. Pick the best mask (when multimask_output=True)
     if multimask_output:
         best_iou_inds = torch.argmax(ious, dim=-1)
         batch_inds = torch.arange(B, device=device)
@@ -152,14 +152,14 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
 
 def compute_loss(pred_masks, pred_ious, gt_masks, num_objects, weight_dict=None):
     """
-    计算loss（focal loss + dice loss，论文配置：20:1）
+    Compute the loss (focal loss + dice loss, paper-configured ratio 20:1).
     
     Args:
-        pred_masks: (B, M, H, W) 预测mask logits（multimask输出）
-        pred_ious: (B, M) 预测IoU（未使用，仅保留接口兼容性）
-        gt_masks: (B, 1, H, W) 真实mask [0, 1]
-        num_objects: 对象数量（batch size）
-        weight_dict: loss权重字典
+        pred_masks: (B, M, H, W) predicted mask logits (multimask)
+        pred_ious: (B, M) predicted IoUs (unused; kept for API compatibility)
+        gt_masks: (B, 1, H, W) ground-truth mask, values in [0, 1]
+        num_objects: number of objects (batch size)
+        weight_dict: loss-weighting dictionary
     
     Returns:
         total_loss, focal_loss, dice_loss_val
@@ -168,14 +168,14 @@ def compute_loss(pred_masks, pred_ious, gt_masks, num_objects, weight_dict=None)
 
     if weight_dict is None:
         weight_dict = {
-            "loss_mask": 20.0,  # focal loss权重（论文：20）
-            "loss_dice": 1.0,   # dice loss权重（论文：1）
+            "loss_mask": 20.0,  # focal-loss weight (paper: 20)
+            "loss_dice": 1.0,   # dice-loss weight (paper: 1)
         }
     
-    # 扩展gt_masks以匹配multimask输出
+    # Broadcast gt_masks to match the multimask output
     gt_masks_expanded = gt_masks.expand_as(pred_masks)  # (B, M, H, W)
     
-    # 计算multimask的loss
+    # Compute the multimask loss
     loss_multimask = sigmoid_focal_loss(
         pred_masks,
         gt_masks_expanded,
@@ -192,7 +192,7 @@ def compute_loss(pred_masks, pred_ious, gt_masks, num_objects, weight_dict=None)
         loss_on_multimask=True,
     )  # (B, M)
     
-    # 选择loss最小的mask进行反向传播（基于focal+dice组合）
+    # Select the lowest-loss mask for backprop (focal + dice combined)
     if loss_multimask.size(1) > 1:
         loss_combo = (
             loss_multimask * weight_dict["loss_mask"]
@@ -206,9 +206,9 @@ def compute_loss(pred_masks, pred_ious, gt_masks, num_objects, weight_dict=None)
         loss_mask = loss_multimask.squeeze(1)
         loss_dice_val = loss_multidice.squeeze(1)
     
-    # 计算加权总loss（仅focal loss和dice loss）
-    # 注意：loss_multimask和loss_multidice已经除以了num_objects
-    # 所以这里使用sum()而不是mean()（与MedSAM2原始实现一致）
+    # Aggregate the weighted total loss (focal + dice only)
+    # Note: loss_multimask and loss_multidice are already divided by num_objects
+    # so we use sum() instead of mean() (matches MedSAM2's original implementation)
     total_loss = (
         loss_mask.sum() * weight_dict["loss_mask"]
         + loss_dice_val.sum() * weight_dict["loss_dice"]
@@ -240,7 +240,7 @@ def compute_loss_with_trace(preds_all, gt_masks, num_objects, weight_dict=None):
 
 
 def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, image_size=512, use_trace=False):
-    """训练一个epoch"""
+    """Train for one epoch."""
     model.train()
     total_loss = 0.0
     total_focal_loss = 0.0
@@ -290,7 +290,7 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
         total_dice_loss += dice_loss_val.item()
         num_batches += 1
         
-        # 更新进度条
+        # Update the progress bar
         pbar.set_postfix({
             'loss': f'{total_loss_val.item():.4f}',
             # 'p_focal': f'{focal_loss.item():.3e}',
@@ -312,7 +312,7 @@ def main():
         "--data", 
         type=str, 
         required=True, 
-        choices=["kits", "pancreas", "lits", "colon", "local"],
+        choices=["kits", "pancreas", "lits", "colon"],
         help="Dataset name"
     )
     parser.add_argument(
@@ -424,22 +424,22 @@ def main():
 
     args = parser.parse_args()
     
-    # 创建输出目录
+    # Create the output directory
     task_name = f"MedSAM2-2D-{'with_TRACE' if args.use_trace else 'baseline'}-{args.data}-{args.ref_type}"
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     model_save_path = os.path.join(args.work_dir, task_name, run_id)
     os.makedirs(model_save_path, exist_ok=True)
     
-    # 保存训练脚本
+    # Save a copy of the training script
     shutil.copyfile(__file__, os.path.join(model_save_path, "train_script.py"))
     
-    # 保存参数
+    # Save the args
     with open(os.path.join(model_save_path, "args.json"), "w") as f:
         json.dump(vars(args), f, indent=2)
     
     device = torch.device(args.device)
     
-    # 构建模型
+    # Build the model
     medsam2_root = os.path.dirname(os.path.abspath(__file__))
     checkpoint_path = os.path.join(medsam2_root, args.checkpoint)
     
@@ -477,7 +477,7 @@ def main():
     print(f"Total parameters: {total_params / 1e6:.2f}M")
     print(f"Trainable parameters: {trainable_params / 1e6:.2f}M")
     
-    # 创建数据集
+    # Create the dataset
     dataset_dir = os.path.join("./2D_data", args.data)
     train_dataset = MedSAM2_2D_Dataset(
         base_dir=dataset_dir,
@@ -532,7 +532,7 @@ def main():
     print(f"Other parameters: {sum(p.numel() for p in other_params) / 1e6:.2f}M")
     print(f"Image encoder LR: {args.vision_lr}, Other LR: {args.lr}" + (f", TRACE LR: {args.refinement_lr}" if refinement_params else ""))
     
-    # 恢复训练
+    # Resume training
     start_epoch = 0
     if args.resume:
         if os.path.isfile(args.resume):
@@ -542,7 +542,7 @@ def main():
             optimizer.load_state_dict(checkpoint.get("optimizer", {}))
             print(f"Resumed from epoch {start_epoch}")
     
-    # 训练循环
+    # Training loop
     losses = []
     focal_losses = []
     dice_losses = []
@@ -570,7 +570,7 @@ def main():
         
         print(f"Epoch {epoch} - Loss: {avg_loss:.4f}, Focal: {avg_focal:.4f}, Dice: {avg_dice:.4f}")
         
-        # 保存checkpoint
+        # Save the checkpoint
         checkpoint = {
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
@@ -580,16 +580,16 @@ def main():
             "dice_loss": avg_dice,
         }
         
-        # 保存最新模型
+        # Save the latest model
         torch.save(checkpoint, os.path.join(model_save_path, "latest.pth"))
         
-        # 保存最佳模型
+        # Save the best model
         if avg_loss < best_loss:
             best_loss = avg_loss
             torch.save(checkpoint, os.path.join(model_save_path, "best.pth"))
             print(f"Saved best model (loss: {best_loss:.4f})")
         
-        # 绘制loss曲线
+        # Plot loss curves
         plt.figure(figsize=(12, 4))
         plt.subplot(1, 3, 1)
         plt.plot(losses)

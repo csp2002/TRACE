@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MedSAM2 2D测试脚本
-用于评估训练后的模型性能
+MedSAM2 2D test script.
+Evaluate the performance of the trained model.
 """
 
 import os
@@ -15,7 +15,7 @@ import json
 import cv2
 from skimage import io
 
-# 添加MedSAM2目录到路径
+# Add the MedSAM2 directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2
@@ -28,18 +28,18 @@ from torch.utils.data import DataLoader
 
 def compute_metrics(pred, target, smooth=1e-6):
     """
-    计算IoU和Dice系数
+    Compute IoU and Dice scores.
     
     Args:
-        pred: 预测mask，binary mask (H, W) 或 (1, H, W)
-        target: 真实mask，binary mask (H, W) 或 (1, H, W)
-        smooth: 平滑参数
+        pred: predicted binary mask, shape (H, W) or (1, H, W)
+        target: ground-truth binary mask, shape (H, W) or (1, H, W)
+        smooth: smoothing constant
     
     Returns:
-        iou: IoU值
-        dice: Dice系数
+        iou: IoU score
+        dice: Dice score
     """
-    # 确保输入为一维数组
+    # Ensure input is a 1-D array
     if len(pred.shape) > 2:
         pred = pred.flatten()
     else:
@@ -50,30 +50,30 @@ def compute_metrics(pred, target, smooth=1e-6):
     else:
         target = target.flatten()
     
-    # 确保是binary mask
+    # Ensure mask is binary
     pred = (pred > 0.5).astype(np.float32)
     target = (target > 0.5).astype(np.float32)
     
-    # 计算交集
+    # Compute intersection
     intersection = np.sum(pred * target)
     
-    # 计算总数
+    # Compute total
     total = np.sum(pred) + np.sum(target)
     
-    # 计算并集
+    # Compute union
     union = total - intersection
     
-    # 计算 IoU
+    # Compute IoU
     iou = (intersection + smooth) / (union + smooth)
     
-    # 计算 Dice 系数
+    # Compute Dice coefficient
     dice = (2. * intersection + smooth) / (total + smooth)
     
     return iou, dice
 
 
 def get_image_mask_paths(root_dir):
-    """获取所有图像和mask路径"""
+    """Collect all image and mask paths."""
     image_paths = []
     mask_paths = []
     ct_dir = os.path.join(root_dir, "CT")
@@ -99,20 +99,20 @@ def get_image_mask_paths(root_dir):
 @torch.no_grad()
 def medsam2_inference(image_predictor, img_rgb, box):
     """
-    使用 MedSAM2 进行推理
+    Run MedSAM2 inference.
     
     Args:
-        image_predictor: SAM2ImagePredictor 实例
-        img_rgb: RGB 格式的图像，HWC 格式，像素值在 [0, 255]
-        box: 边界框，格式为 [x0, y0, x1, y1]
+        image_predictor: SAM2ImagePredictor instance
+        img_rgb: RGB image in HWC format with pixel values in [0, 255]
+        box: bounding box [x0, y0, x1, y1]
     
     Returns:
-        medsam_seg: 分割结果，binary mask (H, W)
+        medsam_seg: predicted binary mask (H, W)
     """
-    # 设置图像
+    # Set the image
     image_predictor.set_image(img_rgb)
     
-    # 预测掩码
+    # Predict the mask
     box_array = np.array(box).reshape(1, 4) if len(box.shape) == 1 else box
     masks, scores, logits = image_predictor.predict(
         point_coords=None,
@@ -123,7 +123,7 @@ def medsam2_inference(image_predictor, img_rgb, box):
         normalize_coords=True,
     )
     
-    # 获取第一个掩码（因为 multimask_output=False）
+    # Take the first mask (multimask_output=False)
     medsam_seg = (masks[0] > 0.0).astype(np.uint8)
     return medsam_seg
 
@@ -160,23 +160,23 @@ def eval_model_trace(model, dataloader, device, image_size=512):
 
 def eval_model(model, image_paths, mask_paths, annotation_path, device, image_size=512):
     """
-    评估模型性能
+    Evaluate model performance.
     
     Args:
-        model: MedSAM2模型
-        image_paths: 图像路径列表
-        mask_paths: mask路径列表
-        annotation_path: annotation字典路径
-        device: 设备
-        image_size: 图像尺寸
+        model: MedSAM2 model
+        image_paths: list of image paths
+        mask_paths: list of mask paths
+        annotation_path: path to the annotation dict
+        device: torch device
+        image_size: model input size
     
     Returns:
-        avg_iou: 平均IoU
-        avg_dice: 平均Dice
+        avg_iou: mean IoU
+        avg_dice: mean Dice
     """
     model.eval()
     
-    # 加载annotation字典
+    # Load the annotation dict
     ref_map = {}
     if annotation_path and os.path.exists(annotation_path):
         with open(annotation_path, 'r') as f:
@@ -192,7 +192,7 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
         image_path = image_paths[i]
         mask_path = mask_paths[i]
         
-        # 读取图像
+        # Read the image
         img_np = io.imread(image_path)
         if len(img_np.shape) == 2:
             img_3c = np.repeat(img_np[:, :, None], 3, axis=-1)
@@ -201,7 +201,7 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
         else:
             img_3c = img_np
         
-        # 确保图像是uint8格式，像素值在[0, 255]
+        # Make sure the image is uint8 in [0, 255]
         if img_3c.dtype != np.uint8:
             img_3c = (img_3c - img_3c.min()) / np.clip(
                 img_3c.max() - img_3c.min(), a_min=1e-8, a_max=None
@@ -210,13 +210,13 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
         
         H, W, _ = img_3c.shape
         
-        # 读取mask
+        # Read the mask
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             print(f"Warning: Cannot read mask {mask_path}, skipping...")
             continue
         
-        # 获取参考mask路径
+        # Resolve the reference-mask path
         case_num = os.path.basename(os.path.dirname(mask_path))
         ref_mask_path = None
         
@@ -227,22 +227,22 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
                 if ref_mask_path and not os.path.exists(ref_mask_path):
                     ref_mask_path = None
         
-        # 如果参考mask不存在，使用当前mask
+        # Fall back to the current mask if the reference is missing
         if ref_mask_path is None or not os.path.exists(ref_mask_path):
             ref_mask_path = mask_path
         
-        # 从参考mask中提取bounding box
+        # Extract the bounding box from the reference mask
         ref_mask = cv2.imread(ref_mask_path, cv2.IMREAD_GRAYSCALE)
         if ref_mask is None:
             print(f"Warning: Cannot read ref_mask {ref_mask_path}, using current mask...")
             ref_mask = mask
         
-        # 调整ref_mask大小到image_size
+        # Resize ref_mask to image_size
         ref_mask_resized = cv2.resize(ref_mask, (image_size, image_size), interpolation=cv2.INTER_NEAREST)
         y_indices, x_indices = np.where(ref_mask_resized > 127)
         
         if len(y_indices) == 0 or len(x_indices) == 0:
-            # 如果参考mask为空，使用当前mask
+            # Fall back to the current mask if the reference mask is empty
             mask_resized = cv2.resize(mask, (image_size, image_size), interpolation=cv2.INTER_NEAREST)
             y_indices, x_indices = np.where(mask_resized > 127)
             if len(y_indices) == 0 or len(x_indices) == 0:
@@ -252,7 +252,7 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
         x_min, x_max = np.min(x_indices), np.max(x_indices)
         y_min, y_max = np.min(y_indices), np.max(y_indices)
         
-        # 将bbox从image_size尺度映射回原始图像尺度
+        # Map bbox back from image_size scale to the original image scale
         x_min = int(x_min * W / image_size)
         x_max = int(x_max * W / image_size)
         y_min = int(y_min * H / image_size)
@@ -260,17 +260,17 @@ def eval_model(model, image_paths, mask_paths, annotation_path, device, image_si
         
         box_prompt = np.array([x_min, y_min, x_max, y_max])
         
-        # 使用MedSAM2进行推理
+        # Run MedSAM2 inference
         medsam_seg = medsam2_inference(image_predictor, img_3c, box_prompt)
         
-        # 调整预测mask大小到原始mask大小
+        # Resize the predicted mask to the original mask size
         if medsam_seg.shape != mask.shape:
             medsam_seg = cv2.resize(medsam_seg, (mask.shape[1], mask.shape[0]), interpolation=cv2.INTER_NEAREST)
         
-        # 二值化mask
+        # Binarize the mask
         mask_binary = (mask > 127).astype(np.uint8)
         
-        # 计算指标
+        # Compute metrics
         iou, dice = compute_metrics(medsam_seg, mask_binary)
         
         total_iou += iou
@@ -289,7 +289,7 @@ def main():
         "--data",
         type=str,
         required=True,
-        choices=["kits", "pancreas", "lits", "colon", "local"],
+        choices=["kits", "pancreas", "lits", "colon"],
         help="Dataset name"
     )
     parser.add_argument(
@@ -357,10 +357,10 @@ def main():
     
     device = torch.device(args.device)
     
-    # 构建模型
+    # Build the model
     medsam2_root = os.path.dirname(os.path.abspath(__file__))
     
-    # 处理checkpoint路径
+    # Resolve the checkpoint path
     if os.path.isabs(args.checkpoint):
         checkpoint_path = args.checkpoint
     else:
@@ -451,7 +451,7 @@ def main():
     print(f"Average Dice: {avg_dice:.4f}")
     print(f"{'='*50}\n")
     
-    # 保存结果
+    # Save the results
     results = {
         "dataset": args.data,
         "ref_type": args.ref_type,

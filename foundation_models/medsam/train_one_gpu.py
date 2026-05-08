@@ -99,7 +99,7 @@ parser = argparse.ArgumentParser()
 #     help="path to training npy files; two subfolders: gts and imgs",
 # )
 parser.add_argument(
-        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon","local"]
+        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
 parser.add_argument("--task_name", type=str, default="MedSAM-ViT-B")
 parser.add_argument("--model_type", type=str, default="vit_b")
@@ -248,10 +248,6 @@ def main():
     best_loss = 1e10
 
     dataset_config = {
-        'local': {
-            'root_path': './2D_data/local',
-            'num_classes': 2,
-        },
         'kits': {
             'root_path': './2D_data/kits',
             'num_classes': 2,

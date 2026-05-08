@@ -1,16 +1,16 @@
-# MedSAM2 2D训练和测试指南
+# MedSAM2 2D Training and Testing Guide
 
-本指南说明如何使用MedSAM2进行2D医学图像分割的训练和测试。
+This guide describes how to train and test MedSAM2 for 2D medical-image segmentation.
 
-## 文件说明
+## Files
 
-1. **`training/dataset/medsam2_2d_dataset.py`**: 数据集类，支持middle和neighbor两种参考slice模式
-2. **`train_medsam2_2d.py`**: 训练脚本
-3. **`test_medsam2_2d.py`**: 测试脚本
+1. **`training/dataset/medsam2_2d_dataset.py`**: dataset class; supports both 'middle' and 'neighbor' reference-slice modes.
+2. **`train_medsam2_2d.py`**: training script.
+3. **`test_medsam2_2d.py`**: test script.
 
-## 数据准备
+## Data preparation
 
-确保你的数据目录结构如下：
+Make sure your data directory looks like this:
 
 ```
 2D_data/
@@ -34,12 +34,12 @@
 ├── kits/
 ├── lits/
 ├── pancreas/
-└── local/
+└── colon/
 ```
 
-### annotation_dict格式
+### annotation_dict format
 
-**middle模式** (`annotation_dict_middle.json`):
+**middle mode** (`annotation_dict_middle.json`):
 ```json
 {
   "colon_001": {
@@ -50,7 +50,7 @@
 }
 ```
 
-**neighbor模式** (`annotation_dict_neighbor.json`):
+**neighbor mode** (`annotation_dict_neighbor.json`):
 ```json
 {
   "colon_001": {
@@ -65,9 +65,9 @@
 }
 ```
 
-## 训练
+## Training
 
-### 基本用法
+### Basic usage
 
 ```bash
 cd <repo>/foundation_models/medsam2
@@ -81,25 +81,25 @@ python train_medsam2_2d.py \
     --device cuda:0
 ```
 
-### 参数说明
+### CLI flags
 
-- `--data`: 数据集名称 (kits, pancreas, lits, colon, local)
-- `--ref_type`: 参考slice类型 (middle, neighbor)
-- `--checkpoint`: 预训练模型路径
-- `--cfg`: 模型配置文件（默认: sam2/configs/sam2.1/sam2.1_hiera_t.yaml）
-- `--batch_size`: 批次大小（默认: 4）
-- `--num_epochs`: 训练轮数（默认: 80）
-- `--lr`: 学习率（默认: 1e-4）
-- `--weight_decay`: 权重衰减（默认: 0.01）
-- `--image_size`: 图像尺寸（默认: 512）
-- `--device`: 设备（默认: cuda:0）
-- `--use_amp`: 使用混合精度训练
-- `--work_dir`: 输出目录（默认: ./work_dir）
-- `--resume`: 恢复训练的checkpoint路径
+- `--data`: dataset name (kits, pancreas, lits, colon)
+- `--ref_type`: reference-slice mode (middle, neighbor)
+- `--checkpoint`: pretrained-model path
+- `--cfg`: model config file (default: sam2/configs/sam2.1/sam2.1_hiera_t.yaml)
+- `--batch_size`: batch size (default: 4)
+- `--num_epochs`: number of training epochs (default: 80)
+- `--lr`: learning rate (default: 1e-4)
+- `--weight_decay`: weight decay (default: 0.01)
+- `--image_size`: image size (default: 512)
+- `--device`: device (default: cuda:0)
+- `--use_amp`: enable mixed-precision training
+- `--work_dir`: output directory (default: ./work_dir)
+- `--resume`: path to a checkpoint for resuming training
 
-### 训练示例
+### Training examples
 
-**使用middle slice作为参考**:
+**Using the middle slice as the reference:**
 ```bash
 python train_medsam2_2d.py \
     --data colon \
@@ -111,7 +111,7 @@ python train_medsam2_2d.py \
     --device cuda:0
 ```
 
-**使用neighbor slice作为参考**:
+**Using the neighbor slice as the reference:**
 ```bash
 python train_medsam2_2d.py \
     --data colon \
@@ -123,7 +123,7 @@ python train_medsam2_2d.py \
     --device cuda:0
 ```
 
-**恢复训练**:
+**Resume training:**
 ```bash
 python train_medsam2_2d.py \
     --data colon \
@@ -133,24 +133,24 @@ python train_medsam2_2d.py \
     --device cuda:0
 ```
 
-### 训练输出
+### Training outputs
 
-训练过程中会在`work_dir`目录下创建以下结构：
+Training writes the following layout under `work_dir`:
 
 ```
 work_dir/
 └── MedSAM2-2D-{dataset}-{ref_type}/
     └── {timestamp}/
-        ├── latest.pth          # 最新checkpoint
-        ├── best.pth            # 最佳checkpoint
-        ├── loss_curves.png     # Loss曲线
-        ├── args.json           # 训练参数
-        └── train_script.py     # 训练脚本备份
+        ├── latest.pth          # latest checkpoint
+        ├── best.pth            # best checkpoint
+        ├── loss_curves.png     # loss curves
+        ├── args.json           # training arguments
+        └── train_script.py     # backup of the training script
 ```
 
-## 测试
+## Testing
 
-### 基本用法
+### Basic usage
 
 ```bash
 cd <repo>/foundation_models/medsam2
@@ -161,18 +161,18 @@ python test_medsam2_2d.py \
     --device cuda:0
 ```
 
-### 参数说明
+### CLI flags
 
-- `--data`: 数据集名称 (kits, pancreas, lits, colon, local)
-- `--ref_type`: 参考slice类型 (middle, neighbor)
-- `--checkpoint`: 模型checkpoint路径（可以是训练checkpoint或预训练模型）
-- `--cfg`: 模型配置文件（默认: sam2/configs/sam2.1/sam2.1_hiera_t.yaml）
-- `--device`: 设备（默认: cuda:0）
-- `--image_size`: 图像尺寸（默认: 512）
+- `--data`: dataset name (kits, pancreas, lits, colon)
+- `--ref_type`: reference-slice mode (middle, neighbor)
+- `--checkpoint`: model checkpoint path (training checkpoint or pretrained model)
+- `--cfg`: model config file (default: sam2/configs/sam2.1/sam2.1_hiera_t.yaml)
+- `--device`: device (default: cuda:0)
+- `--image_size`: image size (default: 512)
 
-### 测试输出
+### Test outputs
 
-测试结果会保存到`results/results_{dataset}_{ref_type}.json`:
+Results are written to `results/results_{dataset}_{ref_type}.json`:
 
 ```json
 {
@@ -185,56 +185,53 @@ python test_medsam2_2d.py \
 }
 ```
 
-## 五个数据集的训练
+## Training on each of the four datasets
 
-你可以分别为每个数据集训练模型：
+You can train one model per dataset:
 
 ```bash
-# Colon数据集
+# Colon dataset
 python train_medsam2_2d.py --data colon --ref_type middle --checkpoint checkpoints/MedSAM2_latest.pt
 
-# Kits数据集
+# KiTS dataset
 python train_medsam2_2d.py --data kits --ref_type middle --checkpoint checkpoints/MedSAM2_latest.pt
 
-# Lits数据集
+# LiTS dataset
 python train_medsam2_2d.py --data lits --ref_type middle --checkpoint checkpoints/MedSAM2_latest.pt
 
-# Pancreas数据集
+# Pancreas dataset
 python train_medsam2_2d.py --data pancreas --ref_type middle --checkpoint checkpoints/MedSAM2_latest.pt
-
-# Local数据集
-python train_medsam2_2d.py --data local --ref_type middle --checkpoint checkpoints/MedSAM2_latest.pt
 ```
 
-同样，你也可以使用neighbor模式训练。
+The neighbor reference mode is invoked the same way.
 
-## 注意事项
+## Notes
 
-1. **内存使用**: 训练过程中每个batch会为每张图像创建一个SAM2ImagePredictor实例，这可能会占用较多内存。如果遇到OOM错误，可以减小batch_size。
+1. **Memory usage**: training builds one SAM2ImagePredictor per image per batch, which can be memory-heavy. Reduce `batch_size` if you hit OOM.
 
-2. **训练速度**: 由于使用了predictor进行训练，训练速度可能不如直接使用模型内部方法。如果需要更快的训练速度，可以考虑使用MedSAM2的完整训练框架。
+2. **Training speed**: routing through the predictor is slower than calling the model's internals directly. For faster training, consider MedSAM2's full training framework.
 
-3. **图像尺寸**: 默认使用512x512。如果原始图像尺寸不同，数据集类会自动调整。
+3. **Image size**: default is 512x512. The dataset class resizes raw inputs as needed.
 
-4. **Box Prompt**: 训练时从参考slice的GT Mask中提取bounding box作为prompt，这与MedSAM的训练方式一致。
+4. **Box prompt**: training extracts the bounding box from the reference slice's GT mask, matching MedSAM's training recipe.
 
-5. **Loss函数**: 使用Dice Loss + BCE Loss的组合。
+5. **Loss**: a combination of Dice loss and BCE loss.
 
-## 与MedSAM代码的对比
+## Comparison with the MedSAM code
 
-本实现参考了MedSAM的训练代码（`MedSAM/train_one_gpu.py`和`MedSAM/My_utils.py`），主要区别：
+This implementation derives from MedSAM's training code (`MedSAM/train_one_gpu.py` and `MedSAM/My_utils.py`); key differences:
 
-1. **模型**: 使用MedSAM2 (SAM2) 替代MedSAM (SAM)
-2. **图像尺寸**: MedSAM使用1024x1024，MedSAM2使用512x512
-3. **推理方式**: MedSAM直接调用模型forward，MedSAM2使用SAM2ImagePredictor
-4. **数据格式**: MedSAM使用float32 [0,1]，MedSAM2使用uint8 [0,255]
+1. **Model**: MedSAM2 (SAM2) replaces MedSAM (SAM).
+2. **Image size**: MedSAM uses 1024x1024; MedSAM2 uses 512x512.
+3. **Inference**: MedSAM calls the model's forward directly; MedSAM2 goes through SAM2ImagePredictor.
+4. **Data format**: MedSAM expects float32 in [0, 1]; MedSAM2 expects uint8 in [0, 255].
 
-## 故障排除
+## Troubleshooting
 
-1. **找不到模块**: 确保你在MedSAM2目录下运行脚本，或者正确设置了PYTHONPATH。
+1. **Module not found**: run the script from the MedSAM2 directory or set PYTHONPATH correctly.
 
-2. **CUDA OOM**: 减小batch_size或使用更小的图像尺寸。
+2. **CUDA OOM**: reduce `batch_size` or shrink the image size.
 
-3. **找不到annotation文件**: 确保训练/测试数据目录下有对应的annotation_dict_middle.json或annotation_dict_neighbor.json文件。
+3. **Annotation file missing**: make sure the training/test data directory contains `annotation_dict_middle.json` or `annotation_dict_neighbor.json`.
 
-4. **Checkpoint加载失败**: 如果是训练checkpoint，确保checkpoint中包含"model"键。如果是预训练模型，直接使用checkpoint路径即可。
+4. **Checkpoint loading failed**: training checkpoints must contain a "model" key. Pretrained models can be loaded directly.

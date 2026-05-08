@@ -44,7 +44,6 @@ from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
 from .networks.swin_unet import SwinUnet,SwinUnet_ours
 from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
-from .networks.MISSFormer import MISSFormer
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
 # MedSAM imports
@@ -879,7 +878,7 @@ class DoctorSimTester:
                     center_mask_uint8 = np.array(Image.open(center_mk_path).convert("L"))
                     H_center, W_center = center_mask_uint8.shape
                     
-                    # Resize center slice mask to current slice dimensions (like MedSAM_box_neighbor.py)
+                    # Resize center slice mask to current slice dimensions
                     center_mask_resized = cv2.resize(center_mask_uint8, (W, H), interpolation=cv2.INTER_NEAREST)
                     box_prompt = medsam_extract_box_from_mask(center_mask_resized)  # (1, 4) [[x, y, x+w, y+h]]
                     # Scale box to 1024x1024 using current slice dimensions (not center slice dimensions!)
@@ -1035,7 +1034,7 @@ class DoctorSimTester:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, default="local", help="dataset name")
+    parser.add_argument("--dataset", type=str, default="kits", choices=["kits", "lits", "pancreas", "colon"], help="dataset name")
     parser.add_argument("--save_path", type=str, default="./simulation_output/",
                         help="path to save simulation results")
     parser.add_argument("--img_size", type=int, default=224, help="input size (for traditional models)")
@@ -1077,7 +1076,6 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     dataset_config = {
-        "local": {"root_path": "./2D_data/local/test", "num_classes": 2},
         "kits": {"root_path": "./2D_data/kits/test", "num_classes": 2},
         "pancreas": {"root_path": "./2D_data/pancreas/test", "num_classes": 2},
         "lits": {"root_path": "./2D_data/lits/test", "num_classes": 2},

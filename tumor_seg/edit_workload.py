@@ -31,7 +31,6 @@ from .networks.unetpp import UNetPlusPlus,UNetPlusPlus_ours
 from .networks.swin_unet import SwinUnet,SwinUnet_ours
 from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
-from .networks.MISSFormer import MISSFormer
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
 # MedSAM imports
@@ -801,7 +800,7 @@ if __name__ == "__main__":
         type=str,
         nargs="+",
         default=None,
-        help='Datasets to run. Default: all 5 datasets. E.g., --datasets local kits',
+        help='Datasets to run. Default: all 4 datasets. E.g., --datasets kits lits',
     )
 
     args = parser.parse_args()
@@ -809,7 +808,6 @@ if __name__ == "__main__":
     np.random.seed(args.seed)
 
     dataset_config = {
-        "local": {"root_path": "./2D_data/local/test", "num_classes": 2},
         "kits": {"root_path": "./2D_data/kits/test", "num_classes": 2},
         "pancreas": {"root_path": "./2D_data/pancreas/test", "num_classes": 2},
         "lits": {"root_path": "./2D_data/lits/test", "num_classes": 2},
@@ -1099,7 +1097,7 @@ if __name__ == "__main__":
         return model1, model2
 
     # -------- Run for all datasets and both modes --------
-    all_datasets = ["local", "kits", "pancreas", "lits", "colon"]
+    all_datasets = ["kits", "pancreas", "lits", "colon"]
     datasets = args.datasets if args.datasets else all_datasets
     ai_modes = ["A", "B"]
     

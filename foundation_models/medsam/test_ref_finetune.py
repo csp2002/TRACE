@@ -54,7 +54,7 @@ parser = argparse.ArgumentParser()
 #     help="path to training npy files; two subfolders: gts and imgs",
 # )
 parser.add_argument(
-        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon","local"]
+        "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
 parser.add_argument("--task_name", type=str, default="MedSAM-ViT-B")
 parser.add_argument("--model_type", type=str, default="vit_b")
@@ -118,20 +118,20 @@ device = torch.device(args.device)
 
 
 def compute_metrics(pred, target, smooth=1e-6):
-    # 将 float 转换为二值 mask
+    # Cast the float prediction to a binary mask
     pred = (pred > 0.5).astype(np.uint8)
     target = (target > 0.5).astype(np.uint8)
     
-    # 展平
+    # Flatten
     pred = pred.flatten()
     target = target.flatten()
     
-    # 交集、总和、并集
+    # Intersection, total, union
     intersection = np.sum(pred * target)
     total = np.sum(pred) + np.sum(target)
     union = total - intersection
 
-    # 计算 IoU 和 Dice
+    # Compute IoU and Dice
     iou = (intersection + smooth) / (union + smooth)
     dice = (2. * intersection + smooth) / (total + smooth)
 
@@ -192,10 +192,6 @@ def main():
     
 
     dataset_config = {
-        'local': {
-            'root_path': './2D_data/local',
-            'num_classes': 2,
-        },
         'kits': {
             'root_path': './2D_data/kits',
             'num_classes': 2,
