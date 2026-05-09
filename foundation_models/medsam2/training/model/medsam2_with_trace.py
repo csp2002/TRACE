@@ -10,7 +10,7 @@ from training.model.trace import TRACE
 
 class MedSAM2_with_TRACE(torch.nn.Module):
     """
-    MedSAM2 with v6554 adds-on module
+    MedSAM2 with the TRACE add-on module.
     Bundles iterative refinement and deep supervision.
     """
     def __init__(

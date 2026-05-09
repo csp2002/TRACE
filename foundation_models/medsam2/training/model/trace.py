@@ -246,7 +246,7 @@ class Decoder_AlignPlusConf(nn.Module):
 
 class TRACE(nn.Module):
     """
-    Refinement module v57 for MedSAM2
+    TRACE refinement module for MedSAM2.
     Uses ResNet18 encoder + Decoder_AlignPlusConf decoder.
     """
     def __init__(self, config, img_size=512, num_classes=2, zero_head=False, vis=False, pretrained=True):
