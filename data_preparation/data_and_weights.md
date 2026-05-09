@@ -11,7 +11,6 @@ Dataset acquisition + conversion, and pretrained-weight placement.
 | **MSD-Pancreas** | [http://medicaldecathlon.com/](http://medicaldecathlon.com/) | Medical Segmentation Decathlon, Task 07 |
 | **MSD-Colon** | [http://medicaldecathlon.com/](http://medicaldecathlon.com/) | Medical Segmentation Decathlon, Task 10 |
 
-After downloading: one folder per dataset with `*.nii.gz` files for both CT volumes and segmentation masks.
 
 ## 2. Data preprocessing pipeline
 
@@ -35,7 +34,7 @@ python -m data_preparation.nifti_to_2d \
     --save_folder ./2D_data/<dataset>/      # optional; defaults to ./2D_data/<dataset>
 ```
 
-Train / test split is read from the bundled [`data_preparation/splits/<dataset>/split.pkl`](splits/) — pancreas / LiTS / colon from [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter), kits from the [KiTS23](https://github.com/neheller/kits23) release. Each entry maps `case_id -> (img_path, seg_path)`, paths relative to `--data_prefix`.
+Train / test split is read from [`data_preparation/splits/<dataset>/split.pkl`](splits/) — pancreas / LiTS / colon from [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter), kits from the [KiTS23](https://github.com/neheller/kits23) release. Each entry maps `case_id -> (img_path, seg_path)`, paths relative to `--data_prefix`.
 
 Resulting layout:
 
@@ -52,7 +51,7 @@ Resulting layout:
 
 ### 2.2 Step 2: Reference slice annotations
 
-The simulation framework needs a "reference" slice per case. Two protocols:
+TRACE and the simulation framework needs a "reference" slice per case. Two protocols:
 
 ```bash
 # Middle-slice protocol: pick the slice with the largest GT mask
@@ -64,19 +63,14 @@ python -m data_preparation.extract_neighbor_slice \
     --root ./2D_data --datasets kits lits pancreas colon
 ```
 
-Output: `annotation_dict_middle.json` / `annotation_dict_neighbor.json`, consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
+Output: `annotation_dict_middle.json` / `annotation_dict_neighbor.json`.
 
 ## 3. Foundation-model weights (for MedSAM and MedSAM2)
 
-| Backbone | File | Source | Place at |
+| Backbone | File | Source | 
 |---|---|---|---|
-| **MedSAM** | `medsam_vit_b.pth` | Wang Lab MedSAM: `https://github.com/bowang-lab/MedSAM` → "Pre-trained weights" | `./foundation_models/medsam/medsam_vit_b.pth` |
-| **MedSAM2** | `MedSAM2_latest.pt` | Wang Lab MedSAM2: `https://github.com/bowang-lab/MedSAM2` → "Checkpoints" | `./foundation_models/medsam2/checkpoints/MedSAM2_latest.pt` |
+| **MedSAM** | `medsam_vit_b.pth` |  `https://github.com/bowang-lab/MedSAM`
+| **MedSAM2** | `MedSAM2_latest.pt` |  `https://github.com/bowang-lab/MedSAM2` 
 
-For up-to-date download URLs, see the upstream README of each project.
 
-## 4. Trained TRACE checkpoints
 
-Trained checkpoints are not redistributed (7 conventional backbones × 4 datasets × 2 variants, plus MedSAM/MedSAM2 variants). Reproduce by running `tumor_seg/train.py` per the top-level Quick Start (~150 epochs per `(model, dataset)` on an A6000-class GPU).
-
-`tumor_seg/simulation.py` loads from `./checkpoints/<exp_subdir>/...`; see its dispatch logic for the subdirectory naming convention (e.g. `transunet_{dataset}224`, `transunet_ours_neighbor_{dataset}224`).
