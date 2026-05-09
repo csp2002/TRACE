@@ -90,7 +90,7 @@ python -m tumor_seg.simulation \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
 
-Each slice's AI prediction is checked against GT at the Dice threshold: below threshold the clinician corrects it ("rejected"), otherwise it is "accepted". The driver sweeps thresholds and reports the rejection rate for **Mode A** (baseline alone) vs **Mode B** (baseline + TRACE).
+Each slice's AI prediction is checked against GT at the Dice threshold. The driver sweeps thresholds and reports the rejection rate for **Mode A** (baseline alone) vs **Mode B** (baseline + TRACE).
 
 A second entry point, `tumor_seg/simulation_other_metrics.py`, supports Surface DSC, FN/FP rate and HD95 as the accept/reject criterion in addition to Dice; it shares the CLI of `simulation.py` plus a `--metric` flag.
 

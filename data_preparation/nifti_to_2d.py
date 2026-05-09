@@ -14,31 +14,10 @@ import matplotlib.pyplot as plt
 import imageio
 
 def _resolve_split_path(args):
-    """Resolve where to load split.pkl from. Priority order:
-
-      1. --split_pkl, if explicitly provided.
-      2. <data_prefix>/split.pkl, if it exists (legacy / 3DSAM-adapter style
-         where the user keeps the split file alongside the raw NIfTI volumes).
-      3. The bundled split file shipped at
-         data_preparation/splits/<dataset>/split.pkl. These are the canonical
-         splits used by the paper; they originate from the 3DSAM-adapter
-         repository's `datafile/<dataset>/split.pkl` for pancreas, LiTS and
-         colon, and from the official KiTS23 release for kits.
-    """
-    if args.split_pkl:
-        return args.split_pkl
-    candidate = os.path.join(args.data_prefix, 'split.pkl')
-    if os.path.isfile(candidate):
-        return candidate
-    bundled = os.path.join(
+    """Return the bundled canonical split for this dataset."""
+    return os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         'splits', args.data, 'split.pkl',
-    )
-    if os.path.isfile(bundled):
-        return bundled
-    raise FileNotFoundError(
-        f"Could not find split.pkl. Tried --split_pkl ({args.split_pkl!r}), "
-        f"{candidate!r}, and {bundled!r}."
     )
 
 
@@ -147,17 +126,6 @@ if __name__ == '__main__':
         "--save_folder",   #folder to save datasets
         default="",
         type=str,
-    )
-    parser.add_argument(
-        "--split_pkl",
-        default="",
-        type=str,
-        help=(
-            "Optional path to split.pkl. If omitted, look first in "
-            "<data_prefix>/split.pkl and otherwise fall back to the bundled "
-            "data_preparation/splits/<dataset>/split.pkl shipped with this "
-            "repository."
-        ),
     )
     parser.add_argument(
         "--intensity_range",

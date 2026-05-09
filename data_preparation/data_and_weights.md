@@ -1,6 +1,6 @@
 # Data and Pretrained Weights
 
-This repository does **not** redistribute datasets or pretrained checkpoints. This document covers (a) how to obtain and convert each dataset, and (b) where to place each set of pretrained weights so the training, testing and simulation code can find them.
+Dataset acquisition + conversion, and pretrained-weight placement.
 
 ## 1. Datasets
 
@@ -11,7 +11,7 @@ This repository does **not** redistribute datasets or pretrained checkpoints. Th
 | **MSD-Pancreas** | [http://medicaldecathlon.com/](http://medicaldecathlon.com/) | Medical Segmentation Decathlon, Task 07 |
 | **MSD-Colon** | [http://medicaldecathlon.com/](http://medicaldecathlon.com/) | Medical Segmentation Decathlon, Task 10 |
 
-After downloading, you should have one folder per dataset containing volumetric NIfTI files (`*.nii.gz`) for both CT volumes and segmentation masks.
+After downloading: one folder per dataset with `*.nii.gz` files for both CT volumes and segmentation masks.
 
 ## 2. Data preprocessing pipeline
 
@@ -33,56 +33,11 @@ python -m data_preparation.nifti_to_2d \
     --data        <dataset>                 # one of: kits, lits, pancreas, colon
     --data_prefix /path/to/raw/<dataset>/   # raw NIfTI root for that dataset
     --save_folder ./2D_data/<dataset>/      # optional; defaults to ./2D_data/<dataset>
-    --split_pkl   /path/to/split.pkl        # optional; see "Train / test split" below
 ```
 
-Per-dataset preprocessing details (all baked into `nifti_to_2d.py`):
+Train / test split is read from the bundled [`data_preparation/splits/<dataset>/split.pkl`](splits/) — pancreas / LiTS / colon from [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter), kits from the [KiTS23](https://github.com/neheller/kits23) release. Each entry maps `case_id -> (img_path, seg_path)`, paths relative to `--data_prefix`.
 
-- Re-orient volumes to a consistent axis order (depth, height, width).
-- Construct **binary** tumor masks by retaining only the dataset-specific tumor label and discarding organ labels.
-- Apply dataset-specific **intensity clipping** to the 0.5th / 99.5th percentiles of foreground voxel intensities. The percentile ranges, foreground mean/std, axis order and target class id are pre-computed and hard-coded per dataset inside `nifti_to_2d.py`, so you do **not** need to recompute statistics; any tool you used to derive them is no longer needed at conversion time.
-- Apply min–max normalisation to map intensities into `[0, 1]`.
-- Extract 2D axial slices and retain only those that contain foreground tumor pixels.
-- Save each retained slice as a grayscale PNG together with its binary mask, organised by case.
-
-#### Train / test split (`split.pkl`)
-
-`nifti_to_2d.py` partitions raw cases into the `train/` and `test/` 2D folders by reading a `split.pkl` file (binary pickle). Format:
-
-```python
-{
-    0: {                                                   # outer is dict {0: ...} or list [{...}]
-        "train": {                                         # case_id -> (img_path, seg_path),
-            "case_00527": ("dataset/case_00527/imaging.nii.gz",
-                           "dataset/case_00527/segmentation.nii.gz"),
-            ...
-        },
-        "val":  { ... },                                   # held out, not consumed by this script
-        "test": { ... },
-    }
-}
-```
-
-The image and segmentation paths inside each entry are **relative to `--data_prefix`**.
-
-We ship the canonical `split.pkl` for each public dataset under [`data_preparation/splits/<dataset>/split.pkl`](splits/). They originate from the [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter) repository's `datafile/<dataset>/split.pkl` (for pancreas / LiTS / colon) and from the [KiTS23](https://github.com/neheller/kits23) official release (for kits). The case counts match what the paper reports:
-
-| Dataset  | Train | Val | Test |
-|----------|------:|----:|-----:|
-| kits     | 342   | 48  | 99   |
-| pancreas | 196   | 28  | 57   |
-| lits     | 83    | 11  | 24   |
-| colon    | 89    | 11  | 26   |
-
-The script's resolution order for `split.pkl` is:
-
-1. `--split_pkl <path>` if you pass it explicitly.
-2. `<data_prefix>/split.pkl`, if it exists. Mirrors the 3DSAM-adapter convention of keeping the split file next to the raw NIfTI volumes.
-3. Otherwise the bundled file at `data_preparation/splits/<dataset>/split.pkl`.
-
-So if your raw NIfTI tree already contains a `split.pkl` (e.g. you cloned 3DSAM-adapter's `datafile/<dataset>/`), the script picks it up automatically; otherwise it falls back to the bundled copy and the run still works without any extra setup.
-
-The resulting layout is:
+Resulting layout:
 
 ```
 2D_data/
@@ -97,7 +52,7 @@ The resulting layout is:
 
 ### 2.2 Step 2: Reference slice annotations
 
-The simulation framework needs to know which slice acts as the "reference" for each case. Two reference protocols are supported:
+The simulation framework needs a "reference" slice per case. Two protocols:
 
 ```bash
 # Middle-slice protocol: pick the slice with the largest GT mask
@@ -109,7 +64,7 @@ python -m data_preparation.extract_neighbor_slice \
     --root ./2D_data --datasets kits lits pancreas colon
 ```
 
-These produce JSON files (`annotation_dict_middle.json`, `annotation_dict_neighbor.json`) consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
+Output: `annotation_dict_middle.json` / `annotation_dict_neighbor.json`, consumed by `tumor_seg/simulation.py` and the `+TRACE` training pipeline.
 
 ## 3. Foundation-model weights (for MedSAM and MedSAM2)
 
@@ -122,6 +77,6 @@ For up-to-date download URLs, see the upstream README of each project.
 
 ## 4. Trained TRACE checkpoints
 
-We do **not** redistribute the trained TRACE checkpoints (~7 conventional backbones × 4 datasets × 2 variants for the 7 conventional models alone, plus MedSAM and MedSAM2 variants). Recreate them by running `tumor_seg/train.py` per the Quick Start in the top-level README. Expect ~150 epochs per `(model, dataset)` on a single A6000-class GPU.
+Trained checkpoints are not redistributed (7 conventional backbones × 4 datasets × 2 variants, plus MedSAM/MedSAM2 variants). Reproduce by running `tumor_seg/train.py` per the top-level Quick Start (~150 epochs per `(model, dataset)` on an A6000-class GPU).
 
-The `tumor_seg/simulation.py` driver expects checkpoints under `./checkpoints/<exp_subdir>/...`; refer to the dispatch logic inside `simulation.py` for the exact subdirectory naming convention (`transunet_{dataset}224`, `transunet_ours_neighbor_{dataset}224`, `medformer_middle_{dataset}224`, `medformer_ours_neighbor_{dataset}224`, etc.).
+`tumor_seg/simulation.py` loads from `./checkpoints/<exp_subdir>/...`; see its dispatch logic for the subdirectory naming convention (e.g. `transunet_{dataset}224`, `transunet_ours_neighbor_{dataset}224`).
