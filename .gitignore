@@ -98,6 +98,10 @@ kits23/
 Simulation/
 simulation_output/
 
+# Training / testing runtime outputs (per-run timestamped dirs + logs)
+foundation_models/medsam2/work_dir/
+test_log/
+
 # Visualization outputs
 fig_*/
 *.pdf
