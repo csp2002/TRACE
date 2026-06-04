@@ -20,8 +20,7 @@ TRACE/
 ├── foundation_models/
 │   ├── medsam/                      # MedSAM + TRACE training/inference
 │   └── medsam2/                     # MedSAM2 + TRACE training/inference
-├── TRACE.yaml                       # Conda env for the 7 conventional models 
-├── medsam.yaml                      # Conda env for MedSAM/MedSAM2
+├── TRACE.yaml                       # Conda env for the 7 conventional models
 └── LICENSE                          # Apache-2.0
 ```
 
@@ -33,6 +32,8 @@ cd TRACE
 conda env create -f TRACE.yaml
 conda activate TRACE
 ```
+
+> **Note on the reference environment.** All experiments in this repository were run on a Linux server with 8× NVIDIA RTX A6000 GPUs (CUDA 11.3, Python 3.9, PyTorch 1.12.1). The pinned versions in `TRACE.yaml` reflect that exact setup. On a different host (different CUDA driver, GPU generation, or OS), some pinned versions may not be installable verbatim — relaxing a few minor-version pins is expected and usually safe.
 
 For the **MedSAM** and **MedSAM2** environments, please follow the installation instructions in their original GitHub repositories: [bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM) and [bowang-lab/MedSAM2](https://github.com/bowang-lab/MedSAM2).
 
@@ -63,9 +64,10 @@ python -m tumor_seg.train --exp_name transunet_ours --dataset colon --ref neighb
 
 `--exp_name` selects the model: pick from `transunet`, `medformer`, `attention_unet`, `unetpp`, `swin_unet`, `FAT_Net`, `H2Former` (baseline) or any of those with `_ours` appended (+TRACE). `--ref` (used only by `_ours`) is `middle` or `neighbor`.
 
-**MedSAM** (`foundation_models/medsam/train_one_gpu.py`, run from the repo root with the `medsam` conda env):
+**MedSAM** (`foundation_models/medsam/train_one_gpu.py`). First activate the MedSAM env you installed from [bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM) (not the `TRACE` env above):
 
 ```bash
+conda activate medsam   # name of the env you created from upstream MedSAM
 cd foundation_models/medsam
 # Baseline MedSAM on Colon — neighbor box prompt
 python train_one_gpu.py --data colon --ref neighbor
@@ -73,9 +75,10 @@ python train_one_gpu.py --data colon --ref neighbor
 python train_one_gpu.py --data colon --ref neighbor --use_trace
 ```
 
-**MedSAM2** (`foundation_models/medsam2/train_medsam2_2d.py`, run from `foundation_models/medsam2/`):
+**MedSAM2** (`foundation_models/medsam2/train_medsam2_2d.py`). First activate the MedSAM2 env you installed from [bowang-lab/MedSAM2](https://github.com/bowang-lab/MedSAM2):
 
 ```bash
+conda activate medsam2  # name of the env you created from upstream MedSAM2
 cd foundation_models/medsam2
 # Baseline MedSAM2 on Colon — neighbor box prompt
 python train_medsam2_2d.py --data colon --ref_type neighbor --checkpoint checkpoints/MedSAM2_latest.pt
