@@ -463,6 +463,10 @@ def main():
             refine_iters=args.refine_iters,
             detach_between_iters=True,
         )
+        # build_sam2 already placed sam2_model on `device`, but the freshly-
+        # constructed refinement_module sits on CPU. Move the whole wrapper so
+        # both halves of MedSAM2_with_TRACE share the training device.
+        model = model.to(device)
         if args.freeze_sam2:
             for p in model.sam2_model.parameters():
                 p.requires_grad = False

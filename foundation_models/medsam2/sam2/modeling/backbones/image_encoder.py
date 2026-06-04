@@ -9,7 +9,11 @@ from typing import List, Optional
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from efficient_track_anything.modeling.efficienttam_utils import LayerNorm2d
+# Upstream imports LayerNorm2d from the `efficient_track_anything` pip package,
+# which is not pinned anywhere in the MedSAM2 install instructions. Use the
+# byte-identical local copy under sam2/modeling/ instead so the vendored sam2
+# package is self-contained.
+from sam2.modeling.sam2_utils import LayerNorm2d
 
 
 
