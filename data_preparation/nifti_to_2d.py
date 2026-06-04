@@ -21,28 +21,16 @@ def _resolve_split_path(args):
     )
 
 
-def data_extraction(args):
+def _process_split(args, split_name, d_split):
+    """Convert one split (train / val / test) of the bundled split.pkl into 2D PNGs
+    under <save_folder>/<split_name>/{CT,Mask}/<case>/<slice_idx>.png."""
     data_prefix = args.data_prefix
-    split_path = _resolve_split_path(args)
-    print(f"[split] using {split_path}")
-
-    with open(split_path, "rb") as f:
-        d_train = pickle.load(f)[0]['train']
-
-    with open(split_path, "rb") as f2:
-        d_test = pickle.load(f2)[0]['test']
-
-    img_files_train = [os.path.join(data_prefix, d_train[i][0].strip("/")) for i in list(d_train.keys())]  #list of nii.gz
-    seg_files_train = [os.path.join(data_prefix, d_train[i][1].strip("/")) for i in list(d_train.keys())]
-    img_files_test = [os.path.join(data_prefix, d_test[i][0].strip("/")) for i in list(d_test.keys())]  #list of nii.gz
-    seg_files_test = [os.path.join(data_prefix, d_test[i][1].strip("/")) for i in list(d_test.keys())]
-    # print('img_files_train:', img_files_train)
-    # print('img_files_test:', img_files_test)
-    # print('seg_files_test:', seg_files_test)
-    # print('seg_files_train:', seg_files_train)
-    for i in range(len(img_files_train)):
-        img_path = img_files_train[i]
-        seg_path = seg_files_train[i]
+    img_files = [os.path.join(data_prefix, d_split[i][0].strip("/")) for i in list(d_split.keys())]
+    seg_files = [os.path.join(data_prefix, d_split[i][1].strip("/")) for i in list(d_split.keys())]
+    print(f"[{split_name}] {len(img_files)} cases")
+    for i in range(len(img_files)):
+        img_path = img_files[i]
+        seg_path = seg_files[i]
         img = nib.load(img_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
         seg = nib.load(seg_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
         # Sanity-check that the image and segmentation shapes match; warn if they don't
@@ -58,8 +46,8 @@ def data_extraction(args):
             case_name = os.path.basename(img_path).split('.')[0]
         else:  # case_name = the second-to-last directory name in the path
             case_name = os.path.basename(os.path.dirname(img_path))
-        image_case_folder = os.path.join(args.save_folder, 'train', 'CT', case_name)
-        seg_case_folder = os.path.join(args.save_folder, 'train', 'Mask', case_name)
+        image_case_folder = os.path.join(args.save_folder, split_name, 'CT', case_name)
+        seg_case_folder = os.path.join(args.save_folder, split_name, 'Mask', case_name)
         os.makedirs(image_case_folder, exist_ok=True)
         os.makedirs(seg_case_folder, exist_ok=True)
         for j in range(img.shape[0]):
@@ -70,46 +58,23 @@ def data_extraction(args):
                 plt.imsave(os.path.join(image_case_folder, f'{j:03d}.png'), img_slice, cmap='gray')
                 plt.imsave(os.path.join(seg_case_folder, f'{j:03d}.png'), seg_slice, cmap='gray')
         print(f"case {case_name} done!")
-        
-    for i in range(len(img_files_test)):
-        img_path = img_files_test[i]
-        seg_path = seg_files_test[i]
-        img = nib.load(img_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
-        seg = nib.load(seg_path).get_fdata().astype(np.float32).transpose(args.spatial_index)
-        # Sanity-check that the image and segmentation shapes match; warn if they don't
-        assert img.shape == seg.shape, f"shape mismatch: {img.shape} vs {seg.shape}"
-        img[np.isnan(img)] = 0
-        seg[np.isnan(seg)] = 0
-        if args.target_class is not None:
-            seg = (seg == args.target_class).astype(np.float32)
-        # Clip by intensity_range, then min-max normalize the image into [0, 1]
-        img = np.clip(img, args.intensity_range[0], args.intensity_range[1])
-        img = (img - args.intensity_range[0]) / (args.intensity_range[1] - args.intensity_range[0])
-        # print('img:', img.shape, img.max(), img.min())
-        if args.data == 'colon':
-            case_name = os.path.basename(img_path).split('.')[0]
-        else:
-            case_name = os.path.basename(os.path.dirname(img_path))
-        image_case_folder = os.path.join(args.save_folder, 'test', 'CT', case_name)
-        seg_case_folder = os.path.join(args.save_folder, 'test', 'Mask', case_name)
-        os.makedirs(image_case_folder, exist_ok=True)
-        os.makedirs(seg_case_folder, exist_ok=True)
-        cnt = 0
-        for j in range(img.shape[0]):
-            img_slice = img[j]
-            seg_slice = seg[j]
-            # Save only slices that contain foreground voxels as PNG; filename is the slice index, zero-padded to 3 digits
-            if seg_slice.sum() != 0:
-                cnt += 1
-                plt.imsave(os.path.join(image_case_folder, f'{j:03d}.png'), img_slice, cmap='gray')
-                plt.imsave(os.path.join(seg_case_folder, f'{j:03d}.png'), seg_slice, cmap='gray')
-                # imageio.imwrite(os.path.join(image_case_folder, f"{j:05d}.png"), img_slice.astype(np.uint8)*255)
-                # print('img_slice:', img_slice.shape, img_slice.max(), img_slice.min())
-                # imageio.imwrite(os.path.join(seg_case_folder, f"{j:05d}.png"), seg_slice.astype(np.uint8)*255)
-        print(f"case {case_name} done!")
-        # print(f"case {case_name} has {cnt} slices with foreground!")
-    
-        
+
+
+def data_extraction(args):
+    split_path = _resolve_split_path(args)
+    print(f"[split] using {split_path}")
+    with open(split_path, "rb") as f:
+        splits = pickle.load(f)[0]
+    # Convert the requested splits. By default, process train + val + test.
+    # The val output is produced for users who want to do their own model
+    # selection; the bundled train/test/simulation drivers only consume
+    # train/ and test/.
+    for split_name in args.splits:
+        if split_name not in splits:
+            print(f"[{split_name}] not present in split.pkl, skipping")
+            continue
+        _process_split(args, split_name, splits[split_name])
+
 
 
 if __name__ == '__main__':
@@ -126,6 +91,13 @@ if __name__ == '__main__':
         "--save_folder",   #folder to save datasets
         default="",
         type=str,
+    )
+    parser.add_argument(
+        "--splits",
+        nargs="+",
+        default=["train", "val", "test"],
+        choices=["train", "val", "test"],
+        help="Which splits in split.pkl to convert (default: all three).",
     )
     parser.add_argument(
         "--intensity_range",
