@@ -263,23 +263,18 @@ def main():
     losses = []
     best_loss = 1e10
 
+    # 2D_data/ lives at the repo root; anchor paths to this file so the script
+    # works regardless of where the user runs it from (e.g., README example
+    # does `cd foundation_models/medsam` first, which broke the old relative
+    # './2D_data/...' paths).
+    _data_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', '..', '2D_data'
+    )
     dataset_config = {
-        'kits': {
-            'root_path': './2D_data/kits',
-            'num_classes': 2,
-        },
-        'pancreas': {
-            'root_path': './2D_data/pancreas',
-            'num_classes': 2,
-        },
-        'lits': {
-            'root_path': './2D_data/lits',
-            'num_classes': 2,
-        },
-        'colon': {
-            'root_path': './2D_data/colon',
-            'num_classes': 2,
-        },
+        'kits':     {'root_path': os.path.join(_data_root, 'kits'),     'num_classes': 2},
+        'pancreas': {'root_path': os.path.join(_data_root, 'pancreas'), 'num_classes': 2},
+        'lits':     {'root_path': os.path.join(_data_root, 'lits'),     'num_classes': 2},
+        'colon':    {'root_path': os.path.join(_data_root, 'colon'),    'num_classes': 2},
     }
     root_path = dataset_config[args.data]['root_path']
     if args.ref == 'neighbor':
@@ -360,7 +355,10 @@ def main():
                     loss = loss_seg + loss_ce
                     # print("loss:", loss.item())
                 else:
-                    medsam_pred = medsam_model(image, boxes_np)
+                    # Baseline MedSAM still has a small refinement module that consumes
+                    # the neighbor-slice ref mask, so all three positional args are required;
+                    # forward() returns (final_mask, ori_res_masks).
+                    medsam_pred, _ori_res = medsam_model(image, boxes_np, ref_gt)
                     loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
                 loss.backward()
                 optimizer.step()

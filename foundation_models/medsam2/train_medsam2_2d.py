@@ -477,8 +477,13 @@ def main():
     print(f"Total parameters: {total_params / 1e6:.2f}M")
     print(f"Trainable parameters: {trainable_params / 1e6:.2f}M")
     
-    # Create the dataset
-    dataset_dir = os.path.join("./2D_data", args.data)
+    # Create the dataset.
+    # 2D_data lives at the repo root; anchor to this file so the script works
+    # regardless of cwd (the README example does `cd foundation_models/medsam2` first).
+    _data_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', '..', '2D_data'
+    )
+    dataset_dir = os.path.join(_data_root, args.data)
     train_dataset = MedSAM2_2D_Dataset(
         base_dir=dataset_dir,
         mode="train",

@@ -203,23 +203,16 @@ def main():
     # )  # 93729252
     
 
+    # Anchor 2D_data/ to the repo root (relative to this file) so the script
+    # works regardless of cwd.
+    _data_root = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), '..', '..', '2D_data'
+    )
     dataset_config = {
-        'kits': {
-            'root_path': './2D_data/kits',
-            'num_classes': 2,
-        },
-        'pancreas': {
-            'root_path': './2D_data/pancreas',
-            'num_classes': 2,
-        },
-        'lits': {
-            'root_path': './2D_data/lits',
-            'num_classes': 2,
-        },
-        'colon': {
-            'root_path': './2D_data/colon',
-            'num_classes': 2,
-        },
+        'kits':     {'root_path': os.path.join(_data_root, 'kits'),     'num_classes': 2},
+        'pancreas': {'root_path': os.path.join(_data_root, 'pancreas'), 'num_classes': 2},
+        'lits':     {'root_path': os.path.join(_data_root, 'lits'),     'num_classes': 2},
+        'colon':    {'root_path': os.path.join(_data_root, 'colon'),    'num_classes': 2},
     }
     root_path = dataset_config[args.data]['root_path']
     if args.ref == 'middle':

@@ -354,11 +354,13 @@ def main():
     )
 
     args = parser.parse_args()
-    
+
     device = torch.device(args.device)
-    
+
     # Build the model
     medsam2_root = os.path.dirname(os.path.abspath(__file__))
+    # 2D_data lives at the repo root; anchor here so the script works regardless of cwd.
+    _data_root = os.path.join(medsam2_root, '..', '..', '2D_data')
     
     # Resolve the checkpoint path
     if os.path.isabs(args.checkpoint):
@@ -393,7 +395,7 @@ def main():
         model.load_state_dict(trace_ckpt.get("model", trace_ckpt), strict=False)
         model = model.to(device)
         model.eval()
-        dataset_dir = os.path.join("./2D_data", args.data)
+        dataset_dir = os.path.join(_data_root, args.data)
         test_dataset = MedSAM2_2D_Dataset(
             base_dir=dataset_dir,
             mode="test",
@@ -424,7 +426,7 @@ def main():
             print(f"Warning: Could not load checkpoint as training checkpoint: {e}")
             print("Using checkpoint as pretrained model")
 
-        dataset_dir = os.path.join("./2D_data", args.data, "test")
+        dataset_dir = os.path.join(_data_root, args.data, "test")
         image_paths, mask_paths = get_image_mask_paths(dataset_dir)
         print(f"Test samples: {len(image_paths)}")
 
