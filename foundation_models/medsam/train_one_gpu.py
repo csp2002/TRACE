@@ -112,11 +112,13 @@ parser.add_argument(
 )
 parser.add_argument("--model_type", type=str, default="vit_b")
 parser.add_argument(
-    "-checkpoint", type=str, default="work_dir/SAM/sam_vit_b_01ec64.pth"
+    "-checkpoint", type=str, default="medsam_vit_b.pth",
+    help="Architecture seed; loaded via segment_anything's sam_model_registry. "
+         "Default is the MedSAM-finetuned ckpt itself (shape-compatible with SAM ViT-B). "
+         "The MedSAM weights are reloaded with strict=False right after via --pretrain_model_path, "
+         "so this just avoids the upstream Facebook-AI download prompt that fires when the basename "
+         "is 'sam_vit_b_01ec64.pth' and the file is missing.",
 )
-# parser.add_argument(
-#     "--checkpoint", type=str, default="medsam_vit_b.pth"
-# )
 # parser.add_argument('-device', type=str, default='cuda:0')
 # parser.add_argument(
 #     "--load_pretrain", action='store_false', help="load pretrain model"
