@@ -42,10 +42,13 @@ def _process_split(args, split_name, d_split):
         # Clip by intensity_range, then min-max normalize the image into [0, 1]
         img = np.clip(img, args.intensity_range[0], args.intensity_range[1])
         img = (img - args.intensity_range[0]) / (args.intensity_range[1] - args.intensity_range[0])
-        if args.data == 'colon':  # case_name = filename without the .nii.gz suffix
-            case_name = os.path.basename(img_path).split('.')[0]
-        else:  # case_name = the second-to-last directory name in the path
+        # kits stores per-case folders (`dataset/case_NNNNN/imaging.nii.gz`), so the
+        # case id comes from the parent directory. lits / pancreas / colon all keep the
+        # case id in the filename itself.
+        if args.data == 'kits':
             case_name = os.path.basename(os.path.dirname(img_path))
+        else:
+            case_name = os.path.basename(img_path).split('.')[0]
         image_case_folder = os.path.join(args.save_folder, split_name, 'CT', case_name)
         seg_case_folder = os.path.join(args.save_folder, split_name, 'Mask', case_name)
         os.makedirs(image_case_folder, exist_ok=True)
@@ -149,7 +152,7 @@ if __name__ == '__main__':
         args.spatial_index = [2, 1, 0]
         args.target_class = 2
         if not args.data_prefix:
-            args.data_prefix = 'Task03_Pancreas'
+            args.data_prefix = 'Task07_Pancreas'
     elif args.data == 'lits':
         args.intensity_range = (-46, 164)
         args.global_mean = 60.456020
@@ -157,7 +160,7 @@ if __name__ == '__main__':
         args.spatial_index = [2, 1, 0]
         args.target_class = 2
         if not args.data_prefix:
-            args.data_prefix = 'Task01_LITS17'
+            args.data_prefix = 'LITS17'
     elif args.data == 'colon':
         args.intensity_range = (-30, 166)
         args.global_mean = 64.836747

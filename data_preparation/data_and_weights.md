@@ -32,12 +32,12 @@ Ready for training (tumor_seg/train.py) and simulation (tumor_seg/simulation.py)
 python -m data_preparation.nifti_to_2d \
     --data        colon                 # one of: kits | lits | pancreas | colon
     --data_prefix Task10_Colon          # raw NIfTI root; defaults to the canonical extracted folder name
-                                        # (kits23 / Task01_LITS17 / Task03_Pancreas / Task10_Colon)
+                                        # (kits23 / LITS17 / Task07_Pancreas / Task10_Colon)
     --save_folder ./2D_data/colon       # output root; defaults to ./2D_data/<dataset>
     --splits      train val test        # subset of {train, val, test}; default is all three
 ```
 
-The split is read from [`data_preparation/splits/<dataset>/split.pkl`](splits/) — pancreas / LiTS / colon from [3DSAM-adapter](https://github.com/med-air/3DSAM-adapter), kits from the [KiTS23](https://github.com/neheller/kits23) release. Each entry maps `case_id -> (img_path, seg_path)`, paths relative to `--data_prefix`.
+The split is read from the bundled [`data_preparation/splits/<dataset>/split.pkl`](splits/). Each entry maps `case_id -> (img_path, seg_path)`, with both paths relative to `--data_prefix`. The paths inside each split.pkl assume the dataset has been extracted into the canonical folder for its source archive — `Task10_Colon/` (MSD), `Task07_Pancreas/` (MSD), `LITS17/` (CodaLab LiTS17, both Training_Batch zips extracted into a single directory), `kits23/` (the KiTS23 dataset directory). Override via `--data_prefix` if you put the data elsewhere.
 
 Resulting layout:
 
