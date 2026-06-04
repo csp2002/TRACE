@@ -75,10 +75,14 @@ Output: `annotation_dict_middle.json` / `annotation_dict_neighbor.json`, one pai
 
 ## 3. Foundation-model weights (for MedSAM and MedSAM2)
 
-| Backbone | File | Source | 
+| Backbone | File | Source | Place at |
 |---|---|---|---|
-| **MedSAM** | `medsam_vit_b.pth` |  `https://github.com/bowang-lab/MedSAM`
-| **MedSAM2** | `MedSAM2_latest.pt` |  `https://github.com/bowang-lab/MedSAM2` 
+| **MedSAM** | `medsam_vit_b.pth` | [bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM) → "Pre-trained weights" | `./foundation_models/medsam/medsam_vit_b.pth` |
+| **MedSAM2** | `MedSAM2_latest.pt` | [bowang-lab/MedSAM2](https://github.com/bowang-lab/MedSAM2) → "Checkpoints" | `./foundation_models/medsam2/checkpoints/MedSAM2_latest.pt` |
 
+Both paths are relative to the repository root. The MedSAM2 `checkpoints/` sub-directory needs to be created if it doesn't exist:
 
+```bash
+mkdir -p foundation_models/medsam2/checkpoints
+```
 
