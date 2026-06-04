@@ -29,27 +29,36 @@ def trainer_tumor(args, model, snapshot_path):
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
     if args.ref == 'middle':
-        db_train = Dataset_middle(base_dir=args.root_path,
-                                transform=transforms.Compose(
-                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
+        DatasetCls = Dataset_middle
+        train_transform = transforms.Compose([RandomGenerator_ref(output_size=[args.img_size, args.img_size])])
         print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
-        db_train = Dataset_neighbor(base_dir=args.root_path,
-                                transform=transforms.Compose(
-                                    [RandomGenerator_ref(output_size=[args.img_size, args.img_size])]), mode='train')
+        DatasetCls = Dataset_neighbor
+        train_transform = transforms.Compose([RandomGenerator_ref(output_size=[args.img_size, args.img_size])])
         print('Using neighbor-slice reference dataset')
     else:
-        db_train = Dataset_baseline(base_dir=args.root_path,
-                                   transform=transforms.Compose(
-                                       [RandomGenerator(output_size=[args.img_size, args.img_size])]), mode='train')
+        DatasetCls = Dataset_baseline
+        train_transform = transforms.Compose([RandomGenerator(output_size=[args.img_size, args.img_size])])
         print('Using baseline (no-reference) dataset')
+    db_train = DatasetCls(base_dir=args.root_path, transform=train_transform, mode='train')
+    # Build a val dataset with the same transform pipeline so val loss is
+    # computed under the same preprocessing as training.
+    try:
+        db_val = DatasetCls(base_dir=args.root_path, transform=train_transform, mode='val')
+    except Exception as e:
+        db_val = None
+        logging.warning("val dataset unavailable (%s); skipping val-based best-ckpt selection.", e)
     print("The length of train set is: {}".format(len(db_train)))
+    if db_val is not None:
+        print("The length of val set is: {}".format(len(db_val)))
 
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
 
     trainloader = DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,
                              worker_init_fn=worker_init_fn)
+    valloader = (DataLoader(db_val, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
+                 if db_val is not None and len(db_val) > 0 else None)
     # raise Exception
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
@@ -63,43 +72,36 @@ def trainer_tumor(args, model, snapshot_path):
     max_iterations = args.max_epochs * len(trainloader)  # max_epoch = max_iterations // len(trainloader) + 1
     logging.info("{} iterations per epoch. {} max iterations ".format(len(trainloader), max_iterations))
     best_performance = 0.0
+    best_val_loss = float('inf')
+
+    def _forward_loss(sampled_batch):
+        """Shared forward + (CE + Dice) loss path used by both training and validation."""
+        image_batch = sampled_batch['image'].cuda()
+        label_batch = sampled_batch['label'].cuda()
+        if 'ours' in args.exp_name:
+            ref_image_batch = sampled_batch['ref_image'].unsqueeze(1).cuda()
+            ref_mask_batch = sampled_batch['ref_mask'].unsqueeze(1).cuda()
+            outputs = model(image_batch, ref_image_batch, ref_mask_batch)
+        else:
+            outputs = model(image_batch)
+        if args.deep_supervision:
+            ce = 0
+            dl = 0
+            for logits_i in outputs['iters']:
+                ce = ce + ce_loss(logits_i, label_batch[:].long())
+                dl = dl + dice_loss(logits_i, label_batch, softmax=True)
+        else:
+            # `_ours` models return a dict {'final': ..., 'iters': [...]}; the rest return a tensor.
+            logits_for_loss = outputs['final'] if isinstance(outputs, dict) else outputs
+            ce = ce_loss(logits_for_loss, label_batch[:].long())
+            dl = dice_loss(logits_for_loss, label_batch, softmax=True)
+        return 0.5 * ce + 0.5 * dl, ce
+
     iterator = tqdm(range(max_epoch), ncols=70)
     for epoch_num in iterator:
+        model.train()
         for i_batch, sampled_batch in enumerate(trainloader):
-            image_batch, label_batch, ref_image_batch, ref_mask_batch = sampled_batch['image'], sampled_batch['label'], sampled_batch['ref_image'], sampled_batch['ref_mask']
-            image_batch, label_batch, ref_image_batch, ref_mask_batch = image_batch.cuda(), label_batch.cuda(), ref_image_batch.unsqueeze(1).cuda(), ref_mask_batch.unsqueeze(1).cuda()
-            # print('image_batch:', image_batch.shape, image_batch.max(), image_batch.min())
-            # print('label_batch:', label_batch.shape, label_batch.max(), label_batch.min())
-            # print('ref_image_batch:', ref_image_batch.shape, ref_image_batch.max(), ref_image_batch.min())
-            # print('ref_mask_batch:', ref_mask_batch.shape, ref_mask_batch.max(), ref_mask_batch.min())
-            #img: bs,1,224,224  label: bs,224,224, ref_img: bs,1,224,224, ref_mask: bs,1,224,224
-            #print shape,max,min
-            # print('image:', image_batch.shape, image_batch.max(), image_batch.min())
-            # print('label:', label_batch.shape, label_batch.max(), label_batch.min())
-            # raise Exception
-            
-            if 'ours' in args.exp_name:
-                outputs = model(image_batch, ref_image_batch, ref_mask_batch)
-            else:
-                outputs = model(image_batch)
-            # print('outputs:', outputs.shape, outputs.max(), outputs.min())
-            # raise Exception
-            
-            if args.deep_supervision:
-                loss_ce = 0
-                loss_dice = 0
-                for i, logits_i in enumerate(outputs['iters']):
-                    loss_ce += ce_loss(logits_i, label_batch[:].long())
-                    loss_dice += dice_loss(logits_i, label_batch, softmax=True)
-                # loss_ce /= len(outputs['iters'])
-                # loss_dice /= len(outputs['iters'])
-            else:
-                # `_ours` models return a dict {'final': ..., 'iters': [...]}; the rest return a tensor.
-                logits_for_loss = outputs['final'] if isinstance(outputs, dict) else outputs
-                loss_ce = ce_loss(logits_for_loss, label_batch[:].long())
-                loss_dice = dice_loss(logits_for_loss, label_batch, softmax=True)
-            
-            loss = 0.5 * loss_ce + 0.5 * loss_dice 
+            loss, loss_ce = _forward_loss(sampled_batch)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -113,6 +115,23 @@ def trainer_tumor(args, model, snapshot_path):
             writer.add_scalar('info/loss_ce', loss_ce, iter_num)
 
             logging.info('iteration %d : loss : %f, loss_ce: %f' % (iter_num, loss.item(), loss_ce.item()))
+
+        # ---- end-of-epoch validation: track best-val checkpoint ----
+        if valloader is not None:
+            model.eval()
+            val_losses = []
+            with torch.no_grad():
+                for val_batch in valloader:
+                    v_loss, _ = _forward_loss(val_batch)
+                    val_losses.append(v_loss.item())
+            val_mean = float(np.mean(val_losses)) if val_losses else float('inf')
+            writer.add_scalar('val/total_loss', val_mean, epoch_num)
+            logging.info('[epoch %d] val loss = %f' % (epoch_num, val_mean))
+            if val_mean < best_val_loss:
+                best_val_loss = val_mean
+                best_path = os.path.join(snapshot_path, 'best_model.pth')
+                torch.save(model.state_dict(), best_path)
+                logging.info('[epoch %d] new best val loss = %f -> saved %s' % (epoch_num, val_mean, best_path))
 
             # if iter_num % 20 == 0:
             #     image = image_batch[1, 0:1, :, :]
