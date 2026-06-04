@@ -125,6 +125,16 @@ python -m tumor_seg.edit_workload --model_name TransUNet
 
 Compares per-slice edit effort (treat every slice as 'rejected') between **Mode A** (baseline alone) and **Mode B** (baseline + TRACE with neighbor reference) via FN-rate, FP-rate, HD-95 and Dice-difference between the AI prediction and GT.
 
+**Environment per `--model_name`.** Both simulation entry points dispatch on `--model_name` and lazy-import the corresponding backbone, so the active conda env must carry that backbone's dependencies:
+
+| `--model_name` | activate | one-off install |
+|---|---|---|
+| `TransUNet` / `MedFormer` / `AttentionUNet` / `UNetPlusPlus` / `SwinUnet` / `FAT_Net` / `H2Former` | `TRACE` | — |
+| `MedSAM` | `medsam` | `pip install einops` *(used by the traditional-model architectures the script always parses through; not bundled in MedSAM's upstream env spec)* |
+| `MedSAM2` | `medsam2` | — |
+
+The examples above use `--model_name TransUNet`, so they run as-is in the `TRACE` env. Swap to `MedSAM` or `MedSAM2` only after switching env per the table.
+
 ## 5. Acknowledgements
 
 This repository builds on [TransUNet](https://github.com/Beckschen/TransUNet), [MedSAM](https://github.com/bowang-lab/MedSAM) and [MedSAM2](https://github.com/bowang-lab/MedSAM2). We thank their authors for releasing their code.

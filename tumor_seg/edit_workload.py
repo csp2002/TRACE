@@ -33,19 +33,10 @@ from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
-# MedSAM imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam'))
-from segment_anything import sam_model_registry
-import vit_seg_configs as medsam_configs
-from My_utils import MedSAM_with_TRACE, TRACE
+# MedSAM/MedSAM2 machinery is lazy-imported inside the corresponding dispatch
+# branches so this module stays importable in the `TRACE` conda env (which
+# doesn't ship sam2/hydra/etc.).
 import torch.nn as nn
-
-# MedSAM2 imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2'))
-from sam2.build_sam import build_sam2
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-from training.model.medsam2_with_trace import MedSAM2_with_TRACE
-from training.model.trace import TRACE as medsam2_TRACE
 
 
 # ====================== Metrics =============================
@@ -971,6 +962,12 @@ if __name__ == "__main__":
             model2.load_state_dict(torch.load(ckpt_path2))
             print(f"Loaded model2 ckpt: {ckpt_path2}")
         elif model_name == "MedSAM":
+            # Lazy import — only the `medsam` conda env has segment_anything etc.
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam'))
+            from segment_anything import sam_model_registry
+            import vit_seg_configs as medsam_configs
+            from My_utils import MedSAM_with_TRACE, TRACE
+
             # MedSAM model loading (must create two independent SAM models to avoid overwriting when loading two ckpts)
             medsam_root = os.path.join(os.path.dirname(__file__), '../foundation_models/medsam')
             medsam_base_ckpt = os.path.join(medsam_root, "medsam_vit_b.pth")
@@ -1015,6 +1012,13 @@ if __name__ == "__main__":
             model2 = model2.to(device).eval()
             print("Loaded MedSAM model2 ckpt:", ckpt_path2)
         elif model_name == "MedSAM2":
+            # Lazy import — only the `medsam2` conda env has sam2/hydra/omegaconf installed.
+            sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2'))
+            from sam2.build_sam import build_sam2
+            from sam2.sam2_image_predictor import SAM2ImagePredictor
+            from training.model.medsam2_with_trace import MedSAM2_with_TRACE
+            from training.model.trace import TRACE as medsam2_TRACE
+
             # MedSAM2 model loading
             medsam2_root = os.path.join(os.path.dirname(__file__), '../foundation_models/medsam2')
             import glob
