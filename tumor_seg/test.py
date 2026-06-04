@@ -42,19 +42,11 @@ def compute_metrics(pred, target, smooth=1e-6):
 def inference(args, model, test_save_path=None):
     db_test = args.Dataset(base_dir=args.root_path, mode='test')
     testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-    print("Number of testing samples: ", len(testloader))
-    logging.info("{} test iterations per epoch".format(len(testloader)))
     model.eval()
-    # metric_list = 0.0
     total_iou = 0.0
     total_dice = 0.0
-    th_70 = 0
-    th_75 = 0
-    th_80 = 0
-    th_85 = 0
-    th_90 = 0
 
-    for i_batch, sampled_batch in tqdm(enumerate(testloader)):
+    for i_batch, sampled_batch in tqdm(enumerate(testloader), total=len(testloader), desc="testing", ncols=80):
         image, label, ref_image, ref_mask, _, image_path = (
             sampled_batch["image"].unsqueeze(0).cuda(),
             sampled_batch["label"].cuda(),
@@ -91,21 +83,8 @@ def inference(args, model, test_save_path=None):
             iou, dice = compute_metrics(out_t, label_t)
         else:
             iou, dice = compute_metrics(out, label)
-        if iou<0.2:
-            # print(f"iou: {iou}, dice: {dice}")
-            print(f"image_path: {image_path}")
         total_iou += iou
         total_dice += dice
-        if dice <= 0.7:
-            th_70 += 1
-        if dice <= 0.75:
-            th_75 += 1
-        if dice <= 0.8:
-            th_80 += 1
-        if dice <= 0.85:
-            th_85 += 1
-        if dice <= 0.9:
-            th_90 += 1
 
         #save the image slice by slice, do not use test_single_volume
         # print('image_path:', image_path)
@@ -135,11 +114,8 @@ def inference(args, model, test_save_path=None):
     avg_iou = total_iou / len(db_test)
     avg_dice = total_dice / len(db_test)
     
-    # performance = np.mean(metric_list, axis=0)[0]
-    # mean_hd95 = np.mean(metric_list, axis=0)[1]
-    logging.info('Testing performance in best val model: mean_dice : %f mean_iou : %f' % (avg_dice, avg_iou))
-    logging.info('Testing performance in best val model: th_70 : %d th_75 : %d th_80 : %d th_85 : %d th_90 : %d' % (th_70, th_75, th_80, th_85, th_90))
-    print("Testing Finished!")
+    logging.info('mean_dice=%f mean_iou=%f' % (avg_dice, avg_iou))
+    print(f"Mean Dice: {avg_dice:.4f} | Mean IoU: {avg_iou:.4f}")
 
 
 
@@ -210,17 +186,10 @@ if __name__ == "__main__":
     # args.Dataset = dataset_config[dataset_name]['Dataset']
     if args.test_ref == 'middle':
         args.Dataset = Dataset_middle
-        print('Using middle-slice reference dataset')
     elif args.test_ref == 'neighbor':
         args.Dataset = Dataset_neighbor
-        print('Using neighbor-slice reference dataset')
     else:
         args.Dataset = Dataset_baseline
-        print('Using baseline (no-reference) dataset')
-    # args.list_dir = dataset_config[dataset_name]['list_dir']
-    # args.z_spacing = dataset_config[dataset_name]['z_spacing']
-    
-    print(args)
     args.is_pretrain = True
     # name the same snapshot defined in train script!
     # For OOD testing: --train_dataset overrides --dataset in checkpoint path
@@ -253,66 +222,41 @@ if __name__ == "__main__":
     
     if args.exp_name == 'transunet':
         net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-        print('Using original TransUNet!')
     elif args.exp_name == 'transunet_ours':
         config_small = CONFIGS_ViT_seg['R18-ViT-S_16']
         config_small.n_classes = args.num_classes
         config_small.n_skip = args.n_skip
         config_small.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
         net = TransUNet_ours(config_vit, config_small, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-        print('Using TransUNet + TRACE')
     elif args.exp_name == 'medformer':
-        print('Using medformer baseline model')
         net = MedFormer(in_chan=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'medformer_ours':
-        print('Using medformer + ours model')
         net = MedFormer_ours(in_chan=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'attention_unet':
-        print('Using attention unet baseline model')
         net = AttentionUNet(in_ch=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'attention_unet_ours':
-        print('Using attention unet + ours model')
         net = AttentionUNet_ours(in_ch=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'unetpp':
-        print('Using unet++ baseline model')
         net = UNetPlusPlus(in_ch=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'unetpp_ours':
-        print('Using unet++ + ours model')
         net = UNetPlusPlus_ours(in_ch=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'swin_unet':
-        print('Using swin unet baseline model')
         net = SwinUnet(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'swin_unet_ours':
-        print('Using swin unet + ours model')
         net = SwinUnet_ours(SwinUnet_config(), img_size=args.img_size, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'FAT_Net':
-        print('Using FAT_Net baseline model')
         net = FAT_Net(n_channels=1, n_classes=args.num_classes).cuda()
     elif args.exp_name == 'FAT_Net_ours':
-        print('Using FAT_Net + ours model')
         net = FATNet_ours(in_chan=1, num_classes=args.num_classes).cuda()
     elif args.exp_name == 'H2Former':
-        print('Using H2Former baseline model')
         net = res34_swin_MS(image_size=args.img_size, num_class=args.num_classes).cuda()
     elif args.exp_name == 'H2Former_ours':
-        print('Using H2Former + ours model')
         net = H2Former_ours(img_size=args.img_size, num_classes=args.num_classes).cuda()
     else:
         raise Exception('Invalid experiment name, cannot find appropriate model')
     snapshot = os.path.join(snapshot_path, 'best_model.pth')
     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', 'epoch_'+str(args.max_epochs-1))
-    # snapshot =snapshot.replace('149','39')
     net.load_state_dict(torch.load(snapshot))
-    print('Have loaded snapshot in:',snapshot)
-    # Count model parameters
-    # Print parameter names and counts
-    num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module' in name )
-    print('Number of parameters in refinement_module:', num_params/1e6, 'M')
-    # for name, param in net.named_parameters():
-    #     print(name, param.numel())
-    
-    num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module.decoder' in name )
-    print('Number of parameters in refinement_module.decoder:', num_params/1e6, 'M')
     # raise Exception
     # num_params = sum(p.numel() for p in net.parameters() if 'fusion' not in p.name and 'refinement' not in p.name)
     # print('Number of parameters:', num_params)
@@ -325,11 +269,6 @@ if __name__ == "__main__":
     log_folder = './test_log/test_log_' + args.exp + ood_suffix
     os.makedirs(log_folder, exist_ok=True)
     logging.basicConfig(filename=log_folder + '/'+snapshot_name+".txt", level=logging.INFO, format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.info(str(args))
-    logging.info(snapshot_name)
-    if args.train_dataset:
-        logging.info('OOD testing: train_dataset=%s, test_dataset=%s' % (args.train_dataset, dataset_name))
     if args.is_save:
         # args.test_save_dir = '../predictions'
         test_save_path = os.path.join(args.test_save_dir, args.exp + ood_suffix, snapshot_name)
