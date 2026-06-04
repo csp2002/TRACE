@@ -225,11 +225,11 @@ if __name__ == "__main__":
     # name the same snapshot defined in train script!
     # For OOD testing: --train_dataset overrides --dataset in checkpoint path
     ckpt_dataset = args.train_dataset if args.train_dataset else dataset_name
-    if args.exp_name == 'transunet':
-        args.exp = args.exp_name + '_' + ckpt_dataset + str(args.img_size)
-    else:
+    # Mirror train.py: baseline has no `_<ref>_` token; `_ours` encodes train_ref.
+    if '_ours' in args.exp_name:
         args.exp = args.exp_name + '_' + args.train_ref + '_' + ckpt_dataset + str(args.img_size)
-    # args.exp = args.exp_name + '_' + dataset_name + str(args.img_size)
+    else:
+        args.exp = args.exp_name + '_' + ckpt_dataset + str(args.img_size)
 
     snapshot_path = "./checkpoints/{}/{}".format(args.exp, 'TU')
     snapshot_path = snapshot_path + '_pretrain' if args.is_pretrain else snapshot_path

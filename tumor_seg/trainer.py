@@ -94,8 +94,10 @@ def trainer_tumor(args, model, snapshot_path):
                 # loss_ce /= len(outputs['iters'])
                 # loss_dice /= len(outputs['iters'])
             else:
-                loss_ce = ce_loss(outputs, label_batch[:].long())
-                loss_dice = dice_loss(outputs, label_batch, softmax=True)
+                # `_ours` models return a dict {'final': ..., 'iters': [...]}; the rest return a tensor.
+                logits_for_loss = outputs['final'] if isinstance(outputs, dict) else outputs
+                loss_ce = ce_loss(logits_for_loss, label_batch[:].long())
+                loss_dice = dice_loss(logits_for_loss, label_batch, softmax=True)
             
             loss = 0.5 * loss_ce + 0.5 * loss_dice 
             optimizer.zero_grad()

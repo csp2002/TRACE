@@ -109,7 +109,12 @@ if __name__ == "__main__":
     # args.list_dir = dataset_config[dataset_name]['list_dir']
     
     args.is_pretrain = True
-    args.exp = args.exp_name + '_' + args.ref + '_' + dataset_name + str(args.img_size)
+    # baseline (no `_ours`) trains without a reference slice → its checkpoint
+    # path has no `_<ref>_` token. `_ours` variants do encode the ref protocol.
+    if '_ours' in args.exp_name:
+        args.exp = args.exp_name + '_' + args.ref + '_' + dataset_name + str(args.img_size)
+    else:
+        args.exp = args.exp_name + '_' + dataset_name + str(args.img_size)
     snapshot_path = "./checkpoints/{}/{}".format(args.exp, 'TU')
     snapshot_path = snapshot_path + '_pretrain' if args.is_pretrain else snapshot_path
     snapshot_path += '_' + args.vit_name

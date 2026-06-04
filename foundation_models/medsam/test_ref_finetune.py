@@ -56,7 +56,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
         "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
-parser.add_argument("--task_name", type=str, default="MedSAM-ViT-B")
+parser.add_argument(
+    "--task_name", type=str, default=None,
+    help="Override the auto-generated task_name. If omitted, derived from --use_trace + --ref "
+         "as 'with_TRACE_<ref>' or 'finetune_<ref>'.",
+)
+parser.add_argument(
+    "--use_trace", action="store_true", default=False,
+    help="Load a MedSAM + TRACE checkpoint (model2). Without this flag, load baseline MedSAM (model1).",
+)
 parser.add_argument("--model_type", type=str, default="vit_b")
 
 parser.add_argument(
@@ -89,6 +97,10 @@ parser.add_argument("--work_dir", type=str, default="./work_dir")
 parser.add_argument("--device", type=str, default="cuda:0")
 parser.add_argument('--ref', type=str, default='neighbor', choices=['largest','neighbor','middle'], help='choose the reference slice')
 args = parser.parse_args()
+
+# Auto-construct task_name (mirror train_one_gpu.py).
+if args.task_name is None:
+    args.task_name = f"with_TRACE_{args.ref}" if args.use_trace else f"finetune_{args.ref}"
 
 # if args.use_wandb:
 #     import wandb
@@ -149,7 +161,7 @@ def main():
     # print(type(sam_model))
     # sam_model = sam_model_registry[args.model_type]
     # print('task_name:', args.task_name)
-    if 'with_trace' in args.task_name:
+    if args.use_trace:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
         config_small.n_skip = 3
@@ -240,7 +252,7 @@ def main():
         
         boxes_np = boxes.detach().cpu().numpy()
         image, gt2D, ref_img, ref_gt = image.to(device), gt2D.to(device), ref_img.to(device), ref_gt.to(device)
-        if 'with_trace' in args.task_name:
+        if args.use_trace:
             outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
             medsam_pred = outputs['final']
         else:

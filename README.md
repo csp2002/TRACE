@@ -51,31 +51,51 @@ We evaluate TRACE on diverse segmentation backbones, each in a baseline variant 
 
 ### 4.1 Train
 
-```bash
-# Baseline TransUNet on KiTS
-python -m tumor_seg.train --exp_name transunet --dataset kits
+**7 conventional models** (`tumor_seg/train.py`):
 
-# TransUNet + TRACE (uses neighbor reference protocol)
-python -m tumor_seg.train --exp_name transunet_ours --dataset kits
+```bash
+# Baseline TransUNet on Colon — no reference slice
+python -m tumor_seg.train --exp_name transunet --dataset colon
+
+# TransUNet + TRACE on Colon — neighbor reference (matches the simulation setup below)
+python -m tumor_seg.train --exp_name transunet_ours --dataset colon --ref neighbor
 ```
 
-The `--exp_name` switch maps to baseline (e.g. `transunet`) vs. ours (e.g. `transunet_ours`). See `tumor_seg/train.py` for the full list. 
+`--exp_name` selects the model: pick from `transunet`, `medformer`, `attention_unet`, `unetpp`, `swin_unet`, `FAT_Net`, `H2Former` (baseline) or any of those with `_ours` appended (+TRACE). `--ref` (used only by `_ours`) is `middle` or `neighbor`.
 
-Foundation-model training entry points live under `foundation_models/medsam/` and `foundation_models/medsam2/`.
+**MedSAM** (`foundation_models/medsam/train_one_gpu.py`, run from the repo root with the `medsam` conda env):
 
-Trained checkpoints are written to `./checkpoints/<exp_subdir>/...`; the test and simulation drivers below load from the same location.
+```bash
+cd foundation_models/medsam
+# Baseline MedSAM on Colon — neighbor box prompt
+python train_one_gpu.py --data colon --ref neighbor
+# MedSAM + TRACE on Colon — neighbor reference
+python train_one_gpu.py --data colon --ref neighbor --use_trace
+```
+
+**MedSAM2** (`foundation_models/medsam2/train_medsam2_2d.py`, run from `foundation_models/medsam2/`):
+
+```bash
+cd foundation_models/medsam2
+# Baseline MedSAM2 on Colon — neighbor box prompt
+python train_medsam2_2d.py --data colon --ref_type neighbor --checkpoint checkpoints/MedSAM2_latest.pt
+# MedSAM2 + TRACE on Colon — neighbor reference
+python train_medsam2_2d.py --data colon --ref_type neighbor --use_trace --checkpoint checkpoints/MedSAM2_latest.pt
+```
+
+All training writes checkpoints to subdirectories whose names encode the variant (baseline vs `+TRACE`) and the reference protocol. The test and simulation drivers below load from the same locations.
 
 ### 4.2 Test
 
 ```bash
-# Baseline TransUNet on KiTS test set
-python -m tumor_seg.test --exp_name transunet --dataset kits
+# Baseline TransUNet on Colon test set
+python -m tumor_seg.test --exp_name transunet --dataset colon
 
-# TransUNet + TRACE on KiTS test set
-python -m tumor_seg.test --exp_name transunet_ours --dataset kits --test_ref neighbor
+# TransUNet + TRACE on Colon test set — must match the `--ref` used at training
+python -m tumor_seg.test --exp_name transunet_ours --dataset colon --train_ref neighbor --test_ref neighbor
 ```
 
-`tumor_seg/test.py` reports mean Dice and IoU over all test slices. Pass `--is_save` to additionally dump the predicted masks to `--test_save_dir`. The exact `--exp_name` strings and reference-protocol flags follow the same convention as `train.py`.
+`tumor_seg/test.py` reports mean Dice and IoU over all test slices. `--train_ref` selects which trained checkpoint to load (matches the training `--ref`); `--test_ref` selects which reference protocol to use at test time. Pass `--is_save` to additionally dump the predicted masks to `--test_save_dir`.
 
 ### 4.3 Workflow simulation
 
@@ -86,7 +106,7 @@ Two parallel components implement our slice-by-slice clinician–AI collaboratio
 ```bash
 python -m tumor_seg.simulation \
     --model_name TransUNet \
-    --dataset kits \
+    --dataset colon \
     --thresholds 0.70 0.75 0.80 0.85 0.90 0.95
 ```
 

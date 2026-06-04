@@ -1,5 +1,6 @@
 # OS / Editor
 .DS_Store
+._*
 Thumbs.db
 .vscode/
 .idea/
@@ -70,7 +71,15 @@ snapshots/
 *.h5
 *.hdf5
 *.mat
+
+# Archive files (downloaded datasets)
 *.zip
+*.tar
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.tbz2
+*.7z
 
 # Project-specific data folders
 2D_data/
@@ -78,6 +87,12 @@ data/
 raw/
 processed/
 cache/
+
+# Raw dataset directories (MSD / KiTS default names; downloaded separately)
+Task01_LITS17/
+Task03_Pancreas/
+Task10_Colon/
+kits23/
 
 # Simulation / experiment outputs
 Simulation/

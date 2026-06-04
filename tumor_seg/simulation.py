@@ -1023,7 +1023,7 @@ if __name__ == "__main__":
         print("Created the MedFormer_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "medformer_middle_" + args.dataset + "224",
+            "medformer_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1044,7 +1044,7 @@ if __name__ == "__main__":
         print("Created the AttentionUNet_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "attention_unet_middle_" + args.dataset + "224",
+            "attention_unet_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1065,7 +1065,7 @@ if __name__ == "__main__":
         print("Created the UNetPlusPlus_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "unetpp_middle_" + args.dataset + "224",
+            "unetpp_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1085,7 +1085,7 @@ if __name__ == "__main__":
         print("Created the SwinUnet_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "swin_unet_middle_" + args.dataset + "224",
+            "swin_unet_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1105,7 +1105,7 @@ if __name__ == "__main__":
         print("Created the FATNet_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "FAT_Net_middle_" + args.dataset + "224",
+            "FAT_Net_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1125,7 +1125,7 @@ if __name__ == "__main__":
         print("Created the H2Former_ours as model2!")
         ckpt_path1 = os.path.join(
             "./checkpoints/",
-            "H2Former_middle_" + args.dataset + "224",
+            "H2Former_" + args.dataset + "224",
             "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
         )
         model1.load_state_dict(torch.load(ckpt_path1))
@@ -1219,7 +1219,7 @@ if __name__ == "__main__":
             cfg_path = args.medsam2_cfg
         
         # Model1: standard MedSAM2 (neighbor, no TRACE)
-        ckpt_path1_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-{args.dataset}-neighbor", "*", "best.pth")
+        ckpt_path1_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-baseline-{args.dataset}-neighbor", "*", "best.pth")
         ckpt_path1_list = glob.glob(ckpt_path1_pattern)
         if not ckpt_path1_list:
             raise FileNotFoundError(f"Cannot find model1 checkpoint matching pattern: {ckpt_path1_pattern}")
@@ -1347,13 +1347,13 @@ if __name__ == "__main__":
 
     plt.title(f"{args.model_name} on {args.dataset}")
 
-    out_png = os.path.join(option_dir, "reject_rate_vs_threshold.png")
-    out_pdf = os.path.join(option_dir, "reject_rate_vs_threshold.pdf")
+    out_png = os.path.join(out_dir, "reject_rate_vs_threshold.png")
+    out_pdf = os.path.join(out_dir, "reject_rate_vs_threshold.pdf")
     plt.savefig(out_png, dpi=200, bbox_inches="tight")
     plt.savefig(out_pdf, bbox_inches="tight")
     plt.close()
 
     print(
         f"\nSaved reject-rate curve to:\n  {out_png}\n  {out_pdf}\n"
-        f"and data:\n  {os.path.join(option_dir, 'reject_rate_vs_threshold.json')}\n"
+        f"and data:\n  {os.path.join(out_dir, 'reject_rate_vs_threshold.json')}\n"
     )

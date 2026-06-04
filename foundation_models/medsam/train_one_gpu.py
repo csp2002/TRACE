@@ -101,7 +101,15 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
         "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
-parser.add_argument("--task_name", type=str, default="MedSAM-ViT-B")
+parser.add_argument(
+    "--task_name", type=str, default=None,
+    help="Override the auto-generated task_name. If omitted, derived from --use_trace + --ref "
+         "as 'with_TRACE_<ref>' or 'finetune_<ref>'.",
+)
+parser.add_argument(
+    "--use_trace", action="store_true", default=False,
+    help="Train MedSAM with the TRACE refinement add-on (model2). Without this flag, train baseline MedSAM (model1).",
+)
 parser.add_argument("--model_type", type=str, default="vit_b")
 parser.add_argument(
     "-checkpoint", type=str, default="work_dir/SAM/sam_vit_b_01ec64.pth"
@@ -138,6 +146,12 @@ parser.add_argument("--freeze", action="store_true", default=False, help="freeze
 parser.add_argument('--ref', type=str, default='neighbor', choices=['largest','neighbor','middle'], help='choose the reference slice')
 args = parser.parse_args()
 
+# Auto-construct task_name to match the layout simulation.py expects:
+#   baseline → finetune_<ref>-<dataset>-<timestamp>/medsam_model_best.pth
+#   +TRACE   → with_TRACE_<ref>-<dataset>-<timestamp>/medsam_model_best.pth
+if args.task_name is None:
+    args.task_name = f"with_TRACE_{args.ref}" if args.use_trace else f"finetune_{args.ref}"
+
 if args.use_wandb:
     import wandb
     # print("Using wandb to monitor training")
@@ -171,7 +185,7 @@ def main():
     sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
     # print(type(sam_model))
     # sam_model = sam_model_registry[args.model_type]
-    if 'with_trace' in args.task_name:
+    if args.use_trace:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
         config_small.n_skip = 3
@@ -330,7 +344,7 @@ def main():
                 
                 # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                 # raise Exception
-                if 'with_trace' in args.task_name:
+                if args.use_trace:
                     # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
                     # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                     outputs = medsam_model(image, boxes_np, ref_img, ref_gt)

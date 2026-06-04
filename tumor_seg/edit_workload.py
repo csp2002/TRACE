@@ -873,7 +873,7 @@ if __name__ == "__main__":
             model2 = MedFormer_ours(in_chan=1, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "medformer_middle_" + dataset_name + "224",
+                "medformer_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -890,7 +890,7 @@ if __name__ == "__main__":
             model2 = AttentionUNet_ours(in_ch=1, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "attention_unet_middle_" + dataset_name + "224",
+                "attention_unet_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -907,7 +907,7 @@ if __name__ == "__main__":
             model2 = UNetPlusPlus_ours(in_ch=1, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "unetpp_middle_" + dataset_name + "224",
+                "unetpp_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -924,7 +924,7 @@ if __name__ == "__main__":
             model2 = SwinUnet_ours(SwinUnet_config(), img_size=img_size, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "swin_unet_middle_" + dataset_name + "224",
+                "swin_unet_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -941,7 +941,7 @@ if __name__ == "__main__":
             model2 = FATNet_ours(in_chan=1, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "FAT_Net_middle_" + dataset_name + "224",
+                "FAT_Net_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -958,7 +958,7 @@ if __name__ == "__main__":
             model2 = H2Former_ours(img_size=img_size, num_classes=num_classes).cuda()
             ckpt_path1 = os.path.join(
                 "./checkpoints/",
-                "H2Former_middle_" + dataset_name + "224",
+                "H2Former_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(ckpt_path1))
@@ -1026,7 +1026,7 @@ if __name__ == "__main__":
                 cfg_path = medsam2_cfg
             
             # Model1: standard MedSAM2 (neighbor, no TRACE)
-            ckpt_path1_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-{dataset_name}-neighbor", "*", "best.pth")
+            ckpt_path1_pattern = os.path.join(medsam2_root, "work_dir", f"MedSAM2-2D-baseline-{dataset_name}-neighbor", "*", "best.pth")
             ckpt_path1_list = glob.glob(ckpt_path1_pattern)
             if not ckpt_path1_list:
                 raise FileNotFoundError(f"Cannot find model1 checkpoint matching pattern: {ckpt_path1_pattern}")
