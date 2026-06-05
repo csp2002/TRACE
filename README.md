@@ -105,12 +105,14 @@ python -m tumor_seg.test --exp_name transunet_ours --dataset colon --train_ref n
 ```bash
 conda activate medsam
 cd foundation_models/medsam
+# --ckpt_path: fill in the path to the medsam_model_best.pth your training run saved
+# (under work_dir/<run-folder>/); the paths below show the expected naming.
 # Baseline MedSAM on Colon test set
 python test_ref_finetune.py --data colon --ref neighbor \
-    --ckpt_path work_dir/finetune_neighbor-colon-*/medsam_model_best.pth
+    --ckpt_path work_dir/finetune_neighbor-colon-<timestamp>/medsam_model_best.pth
 # MedSAM + TRACE on Colon test set
 python test_ref_finetune.py --data colon --ref neighbor --use_trace \
-    --ckpt_path work_dir/with_TRACE_neighbor-colon-*/medsam_model_best.pth
+    --ckpt_path work_dir/with_TRACE_neighbor-colon-<timestamp>/medsam_model_best.pth
 ```
 
 **MedSAM2** (run from `foundation_models/medsam2` in the `medsam2` env):
@@ -118,13 +120,15 @@ python test_ref_finetune.py --data colon --ref neighbor --use_trace \
 ```bash
 conda activate medsam2
 cd foundation_models/medsam2
+# --checkpoint / --model_ckpt: fill in the path to the best.pth your training run saved
+# (under work_dir/<run-folder>/); the paths below show the expected naming.
 # Baseline MedSAM2 on Colon test set — --checkpoint is the trained best.pth
 python test_medsam2_2d.py --data colon --ref_type neighbor \
-    --checkpoint work_dir/MedSAM2-2D-baseline-colon-neighbor/*/best.pth
+    --checkpoint work_dir/MedSAM2-2D-baseline-colon-neighbor/<timestamp>/best.pth
 # MedSAM2 + TRACE on Colon test set — base SAM2 weights via --checkpoint, trained TRACE weights via --model_ckpt
 python test_medsam2_2d.py --data colon --ref_type neighbor --use_trace \
     --checkpoint checkpoints/MedSAM2_latest.pt \
-    --model_ckpt work_dir/MedSAM2-2D-with_TRACE-colon-neighbor/*/best.pth
+    --model_ckpt work_dir/MedSAM2-2D-with_TRACE-colon-neighbor/<timestamp>/best.pth
 ```
 
 Both foundation-model test scripts report mean Dice and IoU over the test slices.
