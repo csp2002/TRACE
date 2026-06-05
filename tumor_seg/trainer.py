@@ -30,24 +30,32 @@ def trainer_tumor(args, model, snapshot_path):
     # max_iterations = args.max_iterations
     if args.ref == 'middle':
         DatasetCls = Dataset_middle
-        train_transform = transforms.Compose([RandomGenerator_ref(output_size=[args.img_size, args.img_size])])
+        GenCls = RandomGenerator_ref
         print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
         DatasetCls = Dataset_neighbor
-        train_transform = transforms.Compose([RandomGenerator_ref(output_size=[args.img_size, args.img_size])])
+        GenCls = RandomGenerator_ref
         print('Using neighbor-slice reference dataset')
     else:
         DatasetCls = Dataset_baseline
-        train_transform = transforms.Compose([RandomGenerator(output_size=[args.img_size, args.img_size])])
+        GenCls = RandomGenerator
         print('Using baseline (no-reference) dataset')
+    # Train uses random augmentation; val mirrors the test pipeline (resize only,
+    # no flips/rotations) so the best-checkpoint selection signal is deterministic.
+    train_transform = transforms.Compose([GenCls(output_size=[args.img_size, args.img_size], augment=True)])
+    val_transform = transforms.Compose([GenCls(output_size=[args.img_size, args.img_size], augment=False)])
     db_train = DatasetCls(base_dir=args.root_path, transform=train_transform, mode='train')
-    # Build a val dataset with the same transform pipeline so val loss is
-    # computed under the same preprocessing as training.
+    # In this repo's 2D_data layout the split is encoded in the directory path
+    # (.../<dataset>/{train,val,test}/...), and the Dataset classes build paths
+    # straight from base_dir without inserting `mode`. So to read the held-out
+    # val split we must point base_dir at the sibling val/ directory rather than
+    # rely on mode='val' (which would otherwise re-read the train slices).
+    val_base_dir = os.path.join(os.path.dirname(os.path.normpath(args.root_path)), 'val')
     try:
-        db_val = DatasetCls(base_dir=args.root_path, transform=train_transform, mode='val')
+        db_val = DatasetCls(base_dir=val_base_dir, transform=val_transform, mode='val')
     except Exception as e:
         db_val = None
-        logging.warning("val dataset unavailable (%s); skipping val-based best-ckpt selection.", e)
+        logging.warning("val dataset unavailable at %s (%s); skipping val-based best-ckpt selection.", val_base_dir, e)
     print("The length of train set is: {}".format(len(db_train)))
     if db_val is not None:
         print("The length of val set is: {}".format(len(db_val)))

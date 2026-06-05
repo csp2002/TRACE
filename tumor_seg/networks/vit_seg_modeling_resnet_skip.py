@@ -170,7 +170,7 @@ class ResNetV3(nn.Module): #change input channel to 5
         self.width = width
 
         self.root = nn.Sequential(OrderedDict([
-            ('conv', StdConv2d(5, width, kernel_size=7, stride=2, bias=False, padding=3)),   #csp change input channel to 5
+            ('conv', StdConv2d(5, width, kernel_size=7, stride=2, bias=False, padding=3)),   # input channel = 5
             ('gn', nn.GroupNorm(32, width, eps=1e-6)),
             ('relu', nn.ReLU(inplace=True)),
             # ('pool', nn.MaxPool2d(kernel_size=3, stride=2, padding=0))
@@ -221,7 +221,7 @@ class ResNetV4(nn.Module): #change input channel to 2
         self.width = width
 
         self.root = nn.Sequential(OrderedDict([
-            ('conv', StdConv2d(2, width, kernel_size=7, stride=2, bias=False, padding=3)),   #csp change input channel to 5
+            ('conv', StdConv2d(2, width, kernel_size=7, stride=2, bias=False, padding=3)),   # input channel = 2
             ('gn', nn.GroupNorm(32, width, eps=1e-6)),
             ('relu', nn.ReLU(inplace=True)),
             # ('pool', nn.MaxPool2d(kernel_size=3, stride=2, padding=0))
@@ -273,7 +273,7 @@ class ResNetV5(nn.Module): #change input channel to 1
         self.width = width
 
         self.root = nn.Sequential(OrderedDict([
-            ('conv', StdConv2d(1, width, kernel_size=7, stride=2, bias=False, padding=3)),   #csp change input channel to 5
+            ('conv', StdConv2d(1, width, kernel_size=7, stride=2, bias=False, padding=3)),   # input channel = 1
             ('gn', nn.GroupNorm(32, width, eps=1e-6)),
             ('relu', nn.ReLU(inplace=True)),
             # ('pool', nn.MaxPool2d(kernel_size=3, stride=2, padding=0))

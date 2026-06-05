@@ -66,7 +66,7 @@ parser.add_argument('--freeze',
 parser.add_argument('--auxiliary_loss', action='store_true', help='whether to use auxiliary loss')
 parser.add_argument('--has_confidence', action='store_true', help='whether to use confidence map in refinement module')
 parser.add_argument('--deep_supervision', action='store_true', help='whether to use deep supervision')
-parser.add_argument('--ref', type=str, default='middle', choices=['largest', 'random', 'neighbor','middle'], help='choose the reference slice')
+parser.add_argument('--ref', type=str, default='middle', choices=['neighbor', 'middle'], help='choose the reference slice')
 args = parser.parse_args()
 
 

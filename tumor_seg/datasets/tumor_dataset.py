@@ -22,16 +22,18 @@ def random_rotate(image, label):
     label = ndimage.rotate(label, angle, order=0, reshape=False)
     return image, label
 class RandomGenerator(object):
-    def __init__(self, output_size):
+    def __init__(self, output_size, augment=True):
         self.output_size = output_size
+        self.augment = augment
 
     def __call__(self, sample):
         image, label = sample['image'], sample['label']
 
-        if random.random() > 0.5:
-            image, label = random_rot_flip(image, label)
-        elif random.random() > 0.5:
-            image, label = random_rotate(image, label)
+        if self.augment:
+            if random.random() > 0.5:
+                image, label = random_rot_flip(image, label)
+            elif random.random() > 0.5:
+                image, label = random_rotate(image, label)
         x, y = image.shape
         if x != self.output_size[0] or y != self.output_size[1]:
             image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)  # why not 3?
@@ -69,8 +71,9 @@ def random_rotate_all(img, lbl, ref_img, ref_lbl):
     
     return img, lbl, ref_img, ref_lbl
 class RandomGenerator_ref(object):
-    def __init__(self, output_size):
+    def __init__(self, output_size, augment=True):
         self.output_size = output_size
+        self.augment = augment
 
     def __call__(self, sample):
         image = sample['image']
@@ -79,10 +82,11 @@ class RandomGenerator_ref(object):
         ref_label = sample['ref_mask']
 
         # Synchronized data augmentation
-        if random.random() > 0.5:
-            image, label, ref_image, ref_label = random_rot_flip_all(image, label, ref_image, ref_label)
-        elif random.random() > 0.5:
-            image, label, ref_image, ref_label = random_rotate_all(image, label, ref_image, ref_label)
+        if self.augment:
+            if random.random() > 0.5:
+                image, label, ref_image, ref_label = random_rot_flip_all(image, label, ref_image, ref_label)
+            elif random.random() > 0.5:
+                image, label, ref_image, ref_label = random_rotate_all(image, label, ref_image, ref_label)
 
         # Resize
         x, y = image.shape
@@ -152,7 +156,7 @@ class Dataset_baseline(Dataset):
         # print('mask:', mask.shape, mask.max(), mask.min())
         # # print('image0:', image.shape, image.max(), image.min())
         # normalize image and mask
-        image = (image - image.min()) / (image.max() - image.min())
+        image = (image - image.min()) / (image.max() - image.min() + 1e-8)
         mask = mask / 255.0
 
         x, y = image.shape
@@ -181,7 +185,7 @@ class Dataset_baseline(Dataset):
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
         # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
+        ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min() + 1e-8)
         ref_mask = ref_mask / 255.0
         ref_x, ref_y = ref_image.shape
         ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
@@ -247,7 +251,7 @@ class Dataset_middle(Dataset):   # use middle slice as reference image
         # ---- Original loading + normalization + resize (unchanged) ----
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask  = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        image = (image - image.min()) / (image.max() - image.min())
+        image = (image - image.min()) / (image.max() - image.min() + 1e-8)
         mask  = mask / 255.0
         x, y = image.shape
         image = zoom(image, (224 / x, 224 / y), order=3)
@@ -276,7 +280,7 @@ class Dataset_middle(Dataset):   # use middle slice as reference image
         # Load the reference and apply the same preprocessing (unchanged)
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
         ref_mask  = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
+        ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min() + 1e-8)
         ref_mask  = ref_mask / 255.0
         ref_x, ref_y = ref_mask.shape
         ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)

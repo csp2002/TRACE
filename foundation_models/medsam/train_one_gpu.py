@@ -2,7 +2,7 @@
 """
 train the image encoder and mask decoder
 freeze prompt image encoder
-csp: finetune medsam + our design (v2) with reference mask
+finetune MedSAM + TRACE refinement (with reference mask)
 """
 
 # %% setup environment
@@ -128,7 +128,7 @@ parser.add_argument("--work_dir", type=str, default="./work_dir")
 # train
 parser.add_argument("--num_epochs", type=int, default=80)
 parser.add_argument("--batch_size", type=int, default=2)
-parser.add_argument("--num_workers", type=int, default=8)   #csp change it from 0 to 8
+parser.add_argument("--num_workers", type=int, default=8)
 # Optimizer parameters
 parser.add_argument(
     "-weight_decay", type=float, default=0.01, help="weight decay (default: 0.01)"
@@ -163,11 +163,11 @@ if args.use_wandb:
         config={
             "lr": args.lr,
             "batch_size": args.batch_size,
-            "data_path": args.tr_npy_path,
+            "data_path": args.data,
             "model_type": args.model_type,
         },
     )
-# raise Exception('csp: use wandb to monitor training, but not implemented yet')
+# (optional wandb monitoring is gated by --use_wandb above)
 args.task_name = args.task_name + "-" + args.data
 # %% set up model for training
 # device = args.device
@@ -367,7 +367,7 @@ def main():
             epoch_loss += loss.item()
             iter_num += 1
 
-        epoch_loss /= step
+        epoch_loss /= (step + 1)
         losses.append(epoch_loss)
         if args.use_wandb:
             wandb.log({"epoch_loss": epoch_loss})

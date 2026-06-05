@@ -113,6 +113,10 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
         # info = self.ref_map.get(case_num, None)
         # print("[DEBUG] ref_map.get(case_num) =", repr(info), "type =", type(info))
         # ref_mask_path = os.path.join('./Vol2Flow_me/codes/models',self.dataset,'Vol2Flow_depth:256_M:5_mse',self.dataset+'_result',self.dataset, self.mode, 'Mask',case_num,slice_num)
+        # Default to the current slice as its own reference; the JSON lookup
+        # below overrides these when it records a usable middle-slice reference.
+        ref_image_path = image_path
+        ref_mask_path = mask_path
         info = self.ref_map.get(case_num)
         if isinstance(info, dict):
             # print('info:', info)
@@ -139,9 +143,6 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
         # ref_mask_path = dict[folder_name]
         # print('ref_mask_path:', ref_mask_path,"mask_path:", mask_path)
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        if ref_mask.max() == 0:
-            ref_mask_path = dict[folder_name]
-            ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
         # ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
         ref_mask = ref_mask / 255.0
         ref_x, ref_y = ref_mask.shape
@@ -555,7 +556,7 @@ class Decoder_AlignPlusConf(nn.Module):
         self.dec1 = Conv2dReLU(256, 64, kernel_size=3, padding=1)
 
         self.final_up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-        self.out_conv = nn.Conv2d(64, 1, kernel_size=1)   #csp change 2 to 1 since medsam use 1 channel as final mask rather than 2 classes
+        self.out_conv = nn.Conv2d(64, 1, kernel_size=1)   # 1 output channel (MedSAM uses a single-channel mask, not 2 classes)
 
     def forward(self, t1, t2, t3, x_tar, r1, r2, r3, x_ref=None, confs=None):
         assert confs is not None and len(confs) == 3, "need confs=(conf_112, conf_56, conf_28)"

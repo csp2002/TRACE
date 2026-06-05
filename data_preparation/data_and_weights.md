@@ -61,14 +61,15 @@ TRACE and the simulation framework needs a "reference" slice per case. Two proto
 
 ```bash
 # Default — build reference-slice JSONs for the MSD-Colon 2D output produced above.
-# Middle-slice protocol: pick the slice with the largest GT mask
+# Middle-slice protocol: pick the geometrically central slice that has a GT mask
+# (expanding outward from the exact middle if the central slice has no mask)
 python -m data_preparation.extract_middle_slice --root ./2D_data --datasets colon
 
 # Neighbor-slice protocol: middle slice + previous-slice fallbacks
 python -m data_preparation.extract_neighbor_slice --root ./2D_data --datasets colon
 
-# To process more than one dataset in a single call, list them all after `--datasets`, e.g.
-#   --datasets kits lits pancreas colon
+# To process more than one dataset in a single call, pass a comma-separated list, e.g.
+#   --datasets kits,lits,pancreas,colon
 ```
 
 Output: `annotation_dict_middle.json` / `annotation_dict_neighbor.json`, one pair per `<dataset>/<split>/` directory under `--root`.

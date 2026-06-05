@@ -620,7 +620,7 @@ class TransUNet_ours(nn.Module):
     def __init__(self, config, config_small, img_size=224, num_classes=21843, zero_head=False, vis=False, refine_iters = 3,
             detach_between_iters = True):
         super(TransUNet_ours, self).__init__()
-        self.num_classes = num_classes   #csp: seems no use
+        self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
         self.transformer = Transformer(config, img_size, vis)

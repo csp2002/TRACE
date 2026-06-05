@@ -131,7 +131,7 @@ def get_h14_config():
 
 
 
-#csp added, for smaller segmentation
+# added, for smaller segmentation
 def get_r18_s16_config():
     """Returns the ResNet18 + ViT‑S/16 configuration (lightweight hybrid backbone)."""
     config = get_s16_config()                     # Inherit the small ViT config

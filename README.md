@@ -37,6 +37,8 @@ conda activate TRACE
 
 For the **MedSAM** and **MedSAM2** environments, please follow the installation instructions in their original GitHub repositories: [bowang-lab/MedSAM](https://github.com/bowang-lab/MedSAM) and [bowang-lab/MedSAM2](https://github.com/bowang-lab/MedSAM2).
 
+> **Extra packages for the TRACE add-on.** TRACE's refinement module imports `timm` and `einops`, which are *not* part of the stock MedSAM/MedSAM2 environments (vanilla MedSAM/MedSAM2 do not need them). After creating each foundation-model env, also run `pip install timm einops`. To run the workflow-simulation drivers (`tumor_seg/simulation*.py`, `tumor_seg/edit_workload.py`) with `--model_name MedSAM` or `MedSAM2`, additionally `pip install ml-collections` (imported by the conventional backbones those drivers load).
+
 ## 3. Data and pretrained weights
 
 Please see [`data_preparation/data_and_weights.md`](data_preparation/data_and_weights.md) for details.
@@ -125,7 +127,7 @@ python -m tumor_seg.edit_workload --model_name TransUNet --datasets colon
 
 Compares per-slice edit effort (treat every slice as 'rejected') between **Mode A** (baseline alone) and **Mode B** (baseline + TRACE with neighbor reference) via FN-rate, FP-rate, HD-95 and Dice-difference between the AI prediction and GT.
 
-The examples above use `--model_name TransUNet`, runnable in the `TRACE` env; for `MedSAM` / `MedSAM2`, switch to the matching conda env (`medsam` additionally needs `pip install einops`).
+The examples above use `--model_name TransUNet`, runnable in the `TRACE` env; for `MedSAM` / `MedSAM2`, switch to the matching conda env (which additionally need `pip install timm einops ml-collections` — see the install note in Section 2).
 
 ## 5. Acknowledgements
 

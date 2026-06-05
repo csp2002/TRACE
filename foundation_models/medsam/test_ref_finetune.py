@@ -2,7 +2,7 @@
 """
 train the image encoder and mask decoder
 freeze prompt image encoder
-csp: test the model trained with reference mask
+test the model trained with reference mask
 """
 
 # %% setup environment
@@ -79,7 +79,7 @@ parser.add_argument("--work_dir", type=str, default="./work_dir")
 # train
 # parser.add_argument("--num_epochs", type=int, default=150)
 # parser.add_argument("--batch_size", type=int, default=2)
-# parser.add_argument("--num_workers", type=int, default=8)   #csp change it from 0 to 8
+# parser.add_argument("--num_workers", type=int, default=8)
 # Optimizer parameters
 # parser.add_argument(
 #     "-weight_decay", type=float, default=0.01, help="weight decay (default: 0.01)"
@@ -249,7 +249,9 @@ def main():
             outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
             medsam_pred = outputs['final']
         else:
-            medsam_pred = medsam_model(image, boxes_np)
+            # Baseline MedSAM still consumes the reference mask and returns
+            # (final_mask, ori_res_masks); pass ref_gt and unpack the tuple.
+            medsam_pred, _ = medsam_model(image, boxes_np, ref_gt)
         medsam_pred = torch.sigmoid(medsam_pred)
         final_pred = medsam_pred > 0.5
         iou, dice = compute_metrics(
