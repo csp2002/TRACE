@@ -1,16 +1,3 @@
-# HCI simulation:
-# - Support traditional 2D segmentation models (TransUNet, MedFormer, etc.)
-# - Support MedSAM and MedSAM2 models
-# - Always use GT as final mask (simulate clinicians modifying every slice, even accepted ones)
-# - Sweep thresholds and plot reject rate vs threshold
-# - Two AI modes:
-#     Mode A: per-slice prediction with model1(img) only
-#     Mode B: ref-conditioned prediction with model2(img, ref_img, ref_gt_mask)['final']
-# - Reference protocol (Mode B): for each slice, condition on the previous slice.
-#   The reference mask is the AI's prediction if that previous slice was
-#   accepted by the clinician, otherwise the ground-truth mask the clinician
-#   produced after rejecting it.
-
 import os, json
 import sys
 from typing import List, Dict, Tuple
@@ -26,7 +13,6 @@ from skimage import io, transform
 import argparse
 import matplotlib.pyplot as plt
 
-# Traditional models
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from .networks.vit_seg_modeling import TransUNet_ours as TransUNet_ours
 from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
@@ -38,10 +24,6 @@ from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
-# MedSAM/MedSAM2 machinery is lazy-imported inside the `elif args.model_name == "MedSAM"`
-# and `elif args.model_name == "MedSAM2"` branches below. This keeps the traditional-CNN
-# code paths importable in the `TRACE` conda env, which doesn't carry the foundation-model
-# extras (segment_anything, hydra, omegaconf, ...).
 import torch.nn as nn
 
 

@@ -5,7 +5,6 @@ freeze prompt image encoder
 test the model trained with reference mask
 """
 
-# %% setup environment
 import numpy as np
 import matplotlib.pyplot as plt
 import os

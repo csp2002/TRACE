@@ -1,24 +1,3 @@
-# HCI simulation with pluggable accept/reject metric:
-# - Same simulator framework as simulation.py
-# - Metrics at ORIGINAL resolution for all model types
-# - Pluggable accept/reject metric via --metric:
-#     dice    (higher is better, accept if metric > threshold)
-#     sdsc    (Surface Dice @ 2px tolerance, higher is better)
-#     fn_rate (FN / (FN + TP) = 1 - recall, lower is better)
-#     fp_rate (FP / (FP + TP) = 1 - precision, lower is better)
-#     hd95    (95-percentile symmetric Hausdorff distance in pixels, lower is better)
-# - Support traditional 2D segmentation models (TransUNet, MedFormer, etc.)
-# - Support MedSAM and MedSAM2 models
-# - Always use GT as final mask (simulate clinicians modifying every slice)
-# - Sweep thresholds and plot reject rate vs threshold
-# - Two AI modes:
-#     Mode A: per-slice prediction with model1(img) only
-#     Mode B: ref-conditioned prediction with model2(img, ref_img, ref_gt_mask)['final']
-# - Reference protocol (Mode B): for each slice, condition on the previous slice.
-#   The reference mask is the AI's prediction if that previous slice was
-#   accepted by the clinician, otherwise the ground-truth mask the clinician
-#   produced after rejecting it.
-
 import os, json
 import sys
 from typing import List, Dict, Tuple
@@ -34,7 +13,6 @@ from skimage import io, transform
 import argparse
 import matplotlib.pyplot as plt
 
-# Traditional models
 from .networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from .networks.vit_seg_modeling import TransUNet_ours as TransUNet_ours
 from .networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
@@ -46,9 +24,6 @@ from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
-# MedSAM/MedSAM2 machinery is lazy-imported inside the corresponding dispatch
-# branches so this module stays importable in the `TRACE` conda env (which
-# doesn't ship sam2/hydra/etc.).
 import torch.nn as nn
 
 

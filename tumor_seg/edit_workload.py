@@ -1,12 +1,3 @@
-# Edit Workload Comparison v2:
-# - Compare edit workload between two AI modes
-# - Mode A: per-slice prediction with model1(img) only
-# - Mode B: ref-conditioned prediction with model2(img, ref_img, ref_gt_mask)['final']
-# - Reference mask for Mode B: always GT (neighbor reference, option 1)
-# - Every slice requires doctor's edit (no accept/reject logic)
-# - Metrics: edit ratio (modified pixels / GT pixels)
-# - Support traditional models, MedSAM, and MedSAM2
-
 import os, json
 import sys
 from typing import List, Dict, Tuple
@@ -33,9 +24,6 @@ from .networks.swin_unet import SwinUnet_config
 from .networks.FAT_Net import FAT_Net,FATNet_ours
 from .networks.H2Former import res34_swin_MS,H2Former_ours
 
-# MedSAM/MedSAM2 machinery is lazy-imported inside the corresponding dispatch
-# branches so this module stays importable in the `TRACE` conda env (which
-# doesn't ship sam2/hydra/etc.).
 import torch.nn as nn
 
 

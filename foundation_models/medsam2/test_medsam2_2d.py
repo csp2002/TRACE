@@ -15,7 +15,6 @@ import json
 import cv2
 from skimage import io
 
-# Add the MedSAM2 directory to sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sam2.build_sam import build_sam2

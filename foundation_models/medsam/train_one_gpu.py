@@ -5,7 +5,6 @@ freeze prompt image encoder
 finetune MedSAM + TRACE refinement (with reference mask)
 """
 
-# %% setup environment
 import numpy as np
 import matplotlib.pyplot as plt
 import os
