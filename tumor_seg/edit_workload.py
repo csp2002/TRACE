@@ -845,7 +845,7 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
@@ -853,7 +853,7 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "MedFormer":
             model1 = MedFormer(in_chan=1, num_classes=num_classes).cuda()
             model2 = MedFormer_ours(in_chan=1, num_classes=num_classes).cuda()
@@ -863,14 +863,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "medformer_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "AttentionUNet":
             model1 = AttentionUNet(in_ch=1, num_classes=num_classes).cuda()
             model2 = AttentionUNet_ours(in_ch=1, num_classes=num_classes).cuda()
@@ -880,14 +880,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "attention_unet_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "UNetPlusPlus":
             model1 = UNetPlusPlus(in_ch=1, num_classes=num_classes).cuda()
             model2 = UNetPlusPlus_ours(in_ch=1, num_classes=num_classes).cuda()
@@ -897,14 +897,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "unetpp_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "SwinUnet":
             model1 = SwinUnet(SwinUnet_config(), img_size=img_size, num_classes=num_classes).cuda()
             model2 = SwinUnet_ours(SwinUnet_config(), img_size=img_size, num_classes=num_classes).cuda()
@@ -914,14 +914,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "swin_unet_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "FAT_Net":
             model1 = FAT_Net(n_channels=1, n_classes=num_classes).cuda()
             model2 = FATNet_ours(in_chan=1, num_classes=num_classes).cuda()
@@ -931,14 +931,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "FAT_Net_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "H2Former":
             model1 = res34_swin_MS(image_size=img_size, num_class=num_classes).cuda()
             model2 = H2Former_ours(img_size=img_size, num_classes=num_classes).cuda()
@@ -948,14 +948,14 @@ if __name__ == "__main__":
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model1.load_state_dict(torch.load(_resolve_ckpt(ckpt_path1)))
-            print(f"Loaded model1 ckpt: {ckpt_path1}")
+            print(f"Loaded model1 ckpt: {_resolve_ckpt(ckpt_path1)}")
             ckpt_path2 = os.path.join(
                 "./checkpoints/",
                 "H2Former_ours_neighbor_" + dataset_name + "224",
                 "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224/epoch_149.pth",
             )
             model2.load_state_dict(torch.load(_resolve_ckpt(ckpt_path2)))
-            print(f"Loaded model2 ckpt: {ckpt_path2}")
+            print(f"Loaded model2 ckpt: {_resolve_ckpt(ckpt_path2)}")
         elif model_name == "MedSAM":
             # Lazy import — only the `medsam` conda env has segment_anything etc.
             sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../foundation_models/medsam'))
