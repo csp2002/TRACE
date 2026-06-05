@@ -18,7 +18,7 @@ from .utils import DiceLoss
 from torchvision import transforms
 
 def trainer_tumor(args, model, snapshot_path):
-    from .datasets.tumor_dataset import Dataset_baseline, RandomGenerator, RandomGenerator_ref
+    from .datasets.tumor_dataset import RandomGenerator_ref
     from .datasets.tumor_dataset import Dataset_middle, Dataset_neighbor
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
@@ -29,16 +29,13 @@ def trainer_tumor(args, model, snapshot_path):
     batch_size = args.batch_size * args.n_gpu
     if args.ref == 'middle':
         DatasetCls = Dataset_middle
-        GenCls = RandomGenerator_ref
         print('Using middle-slice reference dataset')
     elif args.ref == 'neighbor':
         DatasetCls = Dataset_neighbor
-        GenCls = RandomGenerator_ref
         print('Using neighbor-slice reference dataset')
     else:
-        DatasetCls = Dataset_baseline
-        GenCls = RandomGenerator
-        print('Using baseline (no-reference) dataset')
+        raise ValueError("--ref must be 'middle' or 'neighbor', got %r" % args.ref)
+    GenCls = RandomGenerator_ref
     # Train uses random augmentation; val mirrors the test pipeline (resize only,
     # no flips/rotations) so the best-checkpoint selection signal is deterministic.
     train_transform = transforms.Compose([GenCls(output_size=[args.img_size, args.img_size], augment=True)])

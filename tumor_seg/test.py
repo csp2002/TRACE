@@ -171,7 +171,7 @@ if __name__ == "__main__":
     elif args.test_ref == 'neighbor':
         args.Dataset = Dataset_neighbor
     else:
-        args.Dataset = Dataset_baseline
+        raise ValueError("--test_ref must be 'middle' or 'neighbor', got %r" % args.test_ref)
     args.is_pretrain = True
     # name the same snapshot defined in train script!
     # For OOD testing: --train_dataset overrides --dataset in checkpoint path

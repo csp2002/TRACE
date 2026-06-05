@@ -320,111 +320,43 @@ class Dataset_neighbor(Dataset):   # use NEIGHBOR slice GT to extract box prompt
             torch.tensor(ref_mask_1024[None, :, :]).float(),
             img_name,
         )
-class refinement(nn.Module):
-    def __init__(self):
-        super(refinement, self).__init__()
-
-        # Expand mask features to 32 channels
-        self.ori_feat_conv = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-        self.pseudo_feat_conv = nn.Conv2d(1, 32, kernel_size=3, padding=1)
-
-        # Multi-scale feature alignment and fusion
-        self.f0_conv = nn.Conv2d(768, 128, kernel_size=3, padding=1)
-        self.f1_conv = nn.Conv2d(768, 128, kernel_size=3, padding=1)
-        self.f2_conv = nn.Conv2d(768, 128, kernel_size=3, padding=1)
-        self.fuse_multi_scale = nn.Conv2d(384, 128, kernel_size=3, padding=1)
-
-        # Dynamic-gate generator
-        self.gate_conv = nn.Sequential(
-            nn.Conv2d(128, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 1, kernel_size=1),
-            nn.Sigmoid()
-        )
-
-        # Final refinement prediction layer
-        self.refine_conv = nn.Sequential(
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 1, kernel_size=1)
-        )
-
-    def forward(self, original_mask, pseudo_mask, f0, f1, f2):
-        bs, _, H, W = original_mask.size()
-        f0 = f0.permute(0, 3, 1, 2)  # (bs,64,64,768) to (bs,768,64,64)
-        f1 = f1.permute(0, 3, 1, 2)
-        f2 = f2.permute(0, 3, 1, 2)
-
-        # Initial mask-feature extraction
-        ori_feat = F.relu(self.ori_feat_conv(original_mask))          # (bs,32,H,W)
-        pseudo_feat = F.relu(self.pseudo_feat_conv(pseudo_mask))      # (bs,32,H,W)
-
-        # Step 2: multi-scale feature alignment and fusion
-        f0 = self.f0_conv(f0) # (bs,128,64,64)
-        f1 = self.f1_conv(f1)                                                                  
-        f2 = self.f2_conv(f2)
-        multi_scale_feat = torch.cat([f0, f1, f2], dim=1)                                # (bs,384,64,64)
-        multi_scale_feat = F.relu(self.fuse_multi_scale(multi_scale_feat))                          # (bs,128,64,64)
-        multi_scale_feat = F.interpolate(multi_scale_feat, size=(H,W), mode='bilinear', align_corners=False) # (bs,128,H,W)
-
-        # Step 3: dynamic-gate generation
-        gate = self.gate_conv(multi_scale_feat)  # (bs,1,H,W), pseudo importance weight
-
-        # Step 4: dynamically fuse the two mask features
-        fused_feat = gate * pseudo_feat + (1 - gate) * ori_feat       # (bs,32,H,W)
-
-        # Step 5: residual prediction of the final mask
-        delta_mask = self.refine_conv(fused_feat)                     # (bs,1,H,W)
-        refined_mask = original_mask + delta_mask                     # (bs,1,H,W)
-
-        return refined_mask
-class MedSAM(nn.Module):
-    def __init__(
-        self,
-        image_encoder,
-        mask_decoder,
-        prompt_encoder,
-        refinement
-    ):
+class MedSAM_Wrapper(nn.Module):
+    """Vanilla MedSAM (no TRACE refinement) — the baseline model. Mirrors the
+    MedSAM_Wrapper used by the simulation drivers, and matches a finetuned MedSAM
+    checkpoint that has no `refinement.*` weights."""
+    def __init__(self, image_encoder, mask_decoder, prompt_encoder):
         super().__init__()
         self.image_encoder = image_encoder
         self.mask_decoder = mask_decoder
         self.prompt_encoder = prompt_encoder
-        self.refinement = refinement
-        # freeze prompt encoder
         for param in self.prompt_encoder.parameters():
             param.requires_grad = False
 
-    def forward(self, image, box, ref_mask):
-        image_embedding, features = self.image_encoder(image)  # (B, 256, 64, 64)
-        f0, f1, f2 = features  # bs,64,64,768
-        # do not compute gradients for prompt encoder
+    def forward(self, image, box):
+        image_embedding, features = self.image_encoder(image)
         with torch.no_grad():
             box_torch = torch.as_tensor(box, dtype=torch.float32, device=image.device)
-            if len(box_torch.shape) == 2:
-                box_torch = box_torch[:, None, :]  # (B, 1, 4)
-
+            if len(box_torch.shape) == 1:
+                box_torch = box_torch.unsqueeze(0).unsqueeze(0)
+            elif len(box_torch.shape) == 2:
+                box_torch = box_torch[:, None, :]
             sparse_embeddings, dense_embeddings = self.prompt_encoder(
-                points=None,
-                boxes=box_torch,
-                masks=None,
+                points=None, boxes=box_torch, masks=None,
             )
         low_res_masks, _ = self.mask_decoder(
-            image_embeddings=image_embedding,  # (B, 256, 64, 64)
-            image_pe=self.prompt_encoder.get_dense_pe(),  # (1, 256, 64, 64)
-            sparse_prompt_embeddings=sparse_embeddings,  # (B, 2, 256)
-            dense_prompt_embeddings=dense_embeddings,  # (B, 256, 64, 64)
+            image_embeddings=image_embedding,
+            image_pe=self.prompt_encoder.get_dense_pe(),
+            sparse_prompt_embeddings=sparse_embeddings,
+            dense_prompt_embeddings=dense_embeddings,
             multimask_output=False,
         )
         ori_res_masks = F.interpolate(
-            low_res_masks,
-            size=(image.shape[2], image.shape[3]),
-            mode="bilinear",
-            align_corners=False,
+            low_res_masks, size=(image.shape[2], image.shape[3]),
+            mode="bilinear", align_corners=False,
         )
-        final_mask = self.refinement(ori_res_masks, ref_mask, f0, f1, f2)
-        return final_mask, ori_res_masks
-from os.path import join as pjoin
+        return ori_res_masks
+
+
 class Conv2dReLU(nn.Sequential):
     def __init__(
             self,
@@ -714,62 +646,3 @@ class MedSAM_with_TRACE(nn.Module):
             preds_all.append(final_pred)
         return {"final": final_pred, "iters": preds_all}
 
-# === Upstream MedSAM dataset class (NpyDataset) ===
-# Used by upstream train_multi_gpus.py (vanilla MedSAM finetuning on .npy files).
-class NpyDataset(Dataset):
-    def __init__(self, data_root, bbox_shift=20):
-        self.data_root = data_root
-        self.gt_path = join(data_root, "gts")
-        self.img_path = join(data_root, "imgs")
-        self.gt_path_files = sorted(
-            glob.glob(join(self.gt_path, "**/*.npy"), recursive=True)
-        )
-        self.gt_path_files = [
-            file
-            for file in self.gt_path_files
-            if os.path.isfile(join(self.img_path, os.path.basename(file)))
-        ]
-        self.bbox_shift = bbox_shift
-        print(f"number of images: {len(self.gt_path_files)}")
-
-    def __len__(self):
-        return len(self.gt_path_files)
-
-    def __getitem__(self, index):
-        # load npy image (1024, 1024, 3), [0,1]
-        img_name = os.path.basename(self.gt_path_files[index])
-        img_1024 = np.load(
-            join(self.img_path, img_name), "r", allow_pickle=True
-        )  # (1024, 1024, 3)
-        # convert the shape to (3, H, W)
-        img_1024 = np.transpose(img_1024, (2, 0, 1))
-        assert (
-            np.max(img_1024) <= 1.0 and np.min(img_1024) >= 0.0
-        ), "image should be normalized to [0, 1]"
-        gt = np.load(
-            self.gt_path_files[index], "r", allow_pickle=True
-        )  # multiple labels [0, 1,4,5...], (256,256)
-        assert img_name == os.path.basename(self.gt_path_files[index]), (
-            "img gt name error" + self.gt_path_files[index] + self.npy_files[index]
-        )
-        label_ids = np.unique(gt)[1:]
-        gt2D = np.uint8(
-            gt == random.choice(label_ids.tolist())
-        )  # only one label, (256, 256)
-        assert np.max(gt2D) == 1 and np.min(gt2D) == 0.0, "ground truth should be 0, 1"
-        y_indices, x_indices = np.where(gt2D > 0)
-        x_min, x_max = np.min(x_indices), np.max(x_indices)
-        y_min, y_max = np.min(y_indices), np.max(y_indices)
-        # add perturbation to bounding box coordinates
-        H, W = gt2D.shape
-        x_min = max(0, x_min - random.randint(0, self.bbox_shift))
-        x_max = min(W, x_max + random.randint(0, self.bbox_shift))
-        y_min = max(0, y_min - random.randint(0, self.bbox_shift))
-        y_max = min(H, y_max + random.randint(0, self.bbox_shift))
-        bboxes = np.array([x_min, y_min, x_max, y_max])
-        return (
-            torch.tensor(img_1024).float(),
-            torch.tensor(gt2D[None, :, :]).long(),
-            torch.tensor(bboxes).float(),
-            img_name,
-        )

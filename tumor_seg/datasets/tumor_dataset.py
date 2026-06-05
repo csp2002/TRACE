@@ -8,40 +8,6 @@ from scipy.ndimage.interpolation import zoom,rotate
 from torch.utils.data import Dataset
 from PIL import Image
 import json
-def random_rot_flip(image, label):
-    k = np.random.randint(0, 4)
-    image = np.rot90(image, k)
-    label = np.rot90(label, k)
-    axis = np.random.randint(0, 2)
-    image = np.flip(image, axis=axis).copy()
-    label = np.flip(label, axis=axis).copy()
-    return image, label
-def random_rotate(image, label):
-    angle = np.random.randint(-20, 20)
-    image = ndimage.rotate(image, angle, order=0, reshape=False)
-    label = ndimage.rotate(label, angle, order=0, reshape=False)
-    return image, label
-class RandomGenerator(object):
-    def __init__(self, output_size, augment=True):
-        self.output_size = output_size
-        self.augment = augment
-
-    def __call__(self, sample):
-        image, label = sample['image'], sample['label']
-
-        if self.augment:
-            if random.random() > 0.5:
-                image, label = random_rot_flip(image, label)
-            elif random.random() > 0.5:
-                image, label = random_rotate(image, label)
-        x, y = image.shape
-        if x != self.output_size[0] or y != self.output_size[1]:
-            image = zoom(image, (self.output_size[0] / x, self.output_size[1] / y), order=3)  # why not 3?
-            label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
-        image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
-        label = torch.from_numpy(label.astype(np.float32))
-        sample = {'image': image, 'label': label.long()}
-        return sample
 def random_rot_flip_all(img, lbl, ref_img, ref_lbl):
     """Synchronized rotate + flip so the main image and the reference image undergo the same transform."""
     k = np.random.randint(0, 4)
@@ -108,76 +74,6 @@ class RandomGenerator_ref(object):
             'ref_image': ref_image,
             'ref_mask': ref_label
         }
-class Dataset_baseline(Dataset):
-    def __init__(self, base_dir, mode, transform=None):
-        self.transform = transform  # using transform in torch!
-        self.data_dir = base_dir
-        self.image_paths, self.mask_paths = self._get_image_mask_paths()
-        self.mode = mode
-    
-    def _get_image_mask_paths(self):
-        image_paths = []
-        mask_paths = []
-        ct_dir = os.path.join(self.data_dir, "CT")
-        
-        for patient_folder in os.listdir(ct_dir):
-            patient_ct_folder = os.path.join(ct_dir, patient_folder)
-            for ct_filename in os.listdir(patient_ct_folder):
-                ct_path = os.path.join(patient_ct_folder, ct_filename)
-                mask_path = ct_path.replace('CT', 'Mask')
-                
-                if os.path.exists(mask_path):
-                    image_paths.append(ct_path)
-                    mask_paths.append(mask_path)
-        
-        return image_paths, mask_paths
-
-    def __len__(self):
-        return len(self.image_paths) 
-
-    def __getitem__(self, idx):
-        image_path = self.image_paths[idx]
-        mask_path = self.mask_paths[idx]
-
-        image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
-        mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        # # print('image0:', image.shape, image.max(), image.min())
-        # normalize image and mask
-        image = (image - image.min()) / (image.max() - image.min() + 1e-8)
-        mask = mask / 255.0
-
-        x, y = image.shape
-        # if x != self.output_size[0] or y != self.output_size[1]:
-        image = zoom(image, (224 / x, 224 / y), order=3)  # why not 3?
-        mask = zoom(mask, (224 / x, 224 / y), order=0)
-            
-        #     image, label = data['image'][:], data['label'][:]
-        folder_name = os.path.dirname(mask_path)
-        dict_path = os.path.join(self.data_dir, 'largest_slice.json')
-        with open(dict_path, 'r') as f:
-            dict = json.load(f)
-        ref_mask_path = dict[folder_name]
-        ref_image_path = ref_mask_path.replace('Mask', 'CT')
-        ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
-        ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min() + 1e-8)
-        ref_mask = ref_mask / 255.0
-        ref_x, ref_y = ref_image.shape
-        ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
-        
-        ref_mask = zoom(ref_mask, (224 / ref_x, 224 / ref_y), order=0)
-        sample = {'image': image, 'label': mask}
-                  
-        if self.transform:
-            sample = self.transform(sample)
-            # Use the second-to-last directory name as case_name
-        sample['ref_image'] = ref_image
-        sample['ref_mask'] = ref_mask
-        sample['case_name'] = os.path.basename(os.path.dirname(image_path))
-        sample['image_path'] = image_path
-        sample['orig_size'] = np.array([x, y])  # original H, W before zoom to 224
-        # Print every key in the sample dict
-        return sample
 class Dataset_middle(Dataset):   # use middle slice as reference image
     def __init__(self, base_dir, mode, transform=None):
         self.transform = transform

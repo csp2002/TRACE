@@ -157,11 +157,10 @@ def main():
         )
         print('Using MedSAM + TRACE')
     else:
-        medsam_model = MedSAM(
+        medsam_model = MedSAM_Wrapper(
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
-            refinement=refinement(),
         )
         print('Using baseline MedSAM')
 
@@ -288,10 +287,8 @@ def main():
                         loss_ce += ce_loss(logits_i, gt2D.float())
                     loss = loss_seg + loss_ce
                 else:
-                    # Baseline MedSAM still has a small refinement module that consumes
-                    # the neighbor-slice ref mask, so all three positional args are required;
-                    # forward() returns (final_mask, ori_res_masks).
-                    medsam_pred, _ori_res = medsam_model(image, boxes_np, ref_gt)
+                    # Baseline MedSAM (no TRACE refinement): box-prompted forward returns the mask.
+                    medsam_pred = medsam_model(image, boxes_np)
                     loss = seg_loss(medsam_pred, gt2D) + ce_loss(medsam_pred, gt2D.float())
                 loss.backward()
                 optimizer.step()

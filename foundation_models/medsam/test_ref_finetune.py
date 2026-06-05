@@ -121,11 +121,10 @@ def main():
         )
         print('Using MedSAM + TRACE')
     else:
-        medsam_model = MedSAM(
+        medsam_model = MedSAM_Wrapper(
             image_encoder=sam_model.image_encoder,
             mask_decoder=sam_model.mask_decoder,
             prompt_encoder=sam_model.prompt_encoder,
-            refinement=refinement(),
         )
         print('Using baseline MedSAM')
 
@@ -181,9 +180,8 @@ def main():
             outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
             medsam_pred = outputs['final']
         else:
-            # Baseline MedSAM still consumes the reference mask and returns
-            # (final_mask, ori_res_masks); pass ref_gt and unpack the tuple.
-            medsam_pred, _ = medsam_model(image, boxes_np, ref_gt)
+            # Baseline MedSAM (no TRACE refinement): box-prompted forward returns the mask.
+            medsam_pred = medsam_model(image, boxes_np)
         medsam_pred = torch.sigmoid(medsam_pred)
         final_pred = medsam_pred > 0.5
         iou, dice = compute_metrics(
