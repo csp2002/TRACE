@@ -96,14 +96,7 @@ class MedFormer_ours(nn.Module):
         probs_ref = torch.softmax(logits_ref, dim=1)
         ref_mask = probs_ref[:, 1:2, :, :]  # (bs, 1, 224, 224)
 
-        # ori_mask = torch.argmax(logits, dim=1).unsqueeze(1)  #bs,1,224,224
-        # ref_mask = torch.argmax(logits_ref, dim=1).unsqueeze(1)  #bs,1,224,224
 
-        # print('ori_mask:',ori_mask.shape,ori_mask.min(),ori_mask.max())
-        # print('mask_ref:',mask_ref.shape,mask_ref.min(),mask_ref.max())
-        # print('ori_image:',ori_image.shape,ori_image.min(),ori_image.max())
-        # raise Exception
-        # new_image = torch.cat([ori_image, ori_mask, ref_image, ref_mask, ref_gt], dim=1)  #bs,5,224,224
         target_image = torch.cat([x, ori_mask], dim=1)  #bs,2,224,224
         ref_image = torch.cat([x_ref, ref_mask, ref_gt], dim=1)  #bs,3,224,224
         preds_all = []  
@@ -124,8 +117,4 @@ class MedFormer_ours(nn.Module):
 
             final_pred = self.refinement_module(target_2ch, ref_image)
             preds_all.append(final_pred)
-        # print('final_pred:',final_pred.shape)
-        # print('logits:',logits.shape)
-        # raise Exception
-        # return logits
         return {"final": final_pred, "iters": preds_all}

@@ -113,9 +113,6 @@ class Embeddings(nn.Module):
         if config.patches.get("grid") is not None:   # ResNet
             
             grid_size = config.patches["grid"]
-            # print('config:',config)
-            # print('grid_size:',grid_size)
-            # print('img_size:',img_size)
             patch_size = (img_size[0] // 16 // grid_size[0], img_size[1] // 16 // grid_size[1])
             patch_size_real = (patch_size[0] * 16, patch_size[1] * 16)
             n_patches = (img_size[0] // patch_size_real[0]) * (img_size[1] // patch_size_real[1])  
@@ -124,7 +121,6 @@ class Embeddings(nn.Module):
             patch_size = _pair(config.patches["size"])
             n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
             self.hybrid = False
-        # raise Exception('Please set the grid size in the config file.')
         if self.hybrid:
             self.hybrid_model = ResNetV2(block_units=config.resnet.num_layers, width_factor=config.resnet.width_factor)
             in_channels = self.hybrid_model.width * 16
@@ -320,24 +316,17 @@ class DecoderCup(nn.Module):
 
         else:
             skip_channels=[0,0,0,0]
-        # print('in_channels:',in_channels)
-        # print('out_channels:',out_channels)
-        # print('skip_channels:',skip_channels)
         blocks = [
             DecoderBlock(in_ch, out_ch, sk_ch) for in_ch, out_ch, sk_ch in zip(in_channels, out_channels, skip_channels)
         ]
         self.blocks = nn.ModuleList(blocks)
 
     def forward(self, hidden_states, features=None):
-        # print('hidden_states:',hidden_states.shape)    #24,196,768
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
         h, w = int(np.sqrt(n_patch)), int(np.sqrt(n_patch))
         x = hidden_states.permute(0, 2, 1)
-        # print('x1:',x.shape)
         x = x.contiguous().view(B, hidden, h, w)  #24,768,14,14
-        # print('x2:',x.shape)
         x = self.conv_more(x)  #24,512,14,14
-        # print('x3:',x.shape)
         #features[0]:24,512,28,28; features[1]:24,256,56,56; features[2]:24,64,112,112
         for i, decoder_block in enumerate(self.blocks):
             if features is not None:
@@ -346,8 +335,6 @@ class DecoderCup(nn.Module):
                 skip = None
             x = decoder_block(x, skip=skip)
             #x.shape:24,256,28,28; 24,64,56,56; 24,16,112,112; 24,16,224,224
-        #     print('d_x'+str(i),x.shape)
-        # print('final_x:',x.shape)
         return x
 class VisionTransformer(nn.Module):   #original in TransUNet
     def __init__(self, config, img_size=224, num_classes=21843, zero_head=False, vis=False):
@@ -573,23 +560,12 @@ class TRACE(nn.Module):   #
     def __init__(self,  img_size=224, num_classes=2, pretrained=True):
         super(TRACE, self).__init__()
         self.num_classes = num_classes
-        # self.transformer = Transformer2(config, img_size, vis)
-        # self.embeddings = Embeddings3(config, img_size)
         self.target_encoder = target_encoder_resnet(img_size, pretrained=pretrained)
         self.reference_encoder = reference_encoder_resnet(img_size, pretrained=pretrained)
         self.decoder = Decoder_AlignPlusConf()
 
-        # self.segmentation_head = SegmentationHead(
-        #     in_channels=config['decoder_channels'][-1],
-        #     out_channels=config['n_classes'],
-        #     kernel_size=3,
-        # )
 
     def forward(self, target, reference):
-        # if x.size()[1] == 1:
-        #     x = x.repeat(1,5,1,1)
-        # x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
-        # print('x:',x.shape)
         # Reference input = [ref_image, ref_mask, ref_gt], shape (B,3,224,224)
         ref_mask = reference[:, 1:2]   # (B,1,224,224)
         ref_gt   = reference[:, 2:3]   # (B,1,224,224)
@@ -603,18 +579,7 @@ class TRACE(nn.Module):   #
 )
 
         
-        # print('x:',x.shape) (bs,1024,14,14)
-        # print('len:',len(features))
-        # print('features:',features[0].shape) (bs,512,28,28)
-        # print('features:',features[1].shape) (bs,256,56,56)
-        # print('features:',features[2].shape) (bs,64,112,112)
-#         logits = self.decoder(
-#     features_tar[2], features_tar[1], features_tar[0], x_tar,
-#     features_ref[2], features_ref[1], features_ref[0], x_ref
-# )
 
-        # logits = self.decoder(features[2], features[1], features[0], x)
-        # logits = self.segmentation_head(x)
         return logits
 class TransUNet_ours(nn.Module):  
     def __init__(self, config, config_small, img_size=224, num_classes=21843, zero_head=False, vis=False, refine_iters = 3,
@@ -637,7 +602,6 @@ class TransUNet_ours(nn.Module):
         # self.refinement_module.load_from(weights=np.load(config_small.pretrained_path))
 
     def forward(self, x,  x_ref, ref_gt):  #x: bs,1,224,224
-        # print('x1:',x.shape)
         ori_image = x
         ref_image = x_ref
         if x.size()[1] == 1:
@@ -647,17 +611,9 @@ class TransUNet_ours(nn.Module):
         x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden) bs,196,768
         x_ref, _, features_ref = self.transformer(x_ref)  # (B, n_patch, hidden) bs,196,768
         f0_o, f1_o, f2_o = features[0], features[1], features[2]
-        # f0_r, f1_r, f2_r = features_ref[0], features_ref[1], features_ref[2]
-        # guidance = self.fusion_module(f0_o, f1_o, f2_o, f0_r, f1_r, f2_r)  # (bs,64,224,224)
-        # print("x2:",x.shape)
-        # print('len:',len(features))
-        # print('feature0:',features[0].shape)
-        # print('feature1:',features[1].shape)
-        # print('feature2:',features[2].shape)
 
         x = self.decoder(x, features)  #bs,16,224,224
         x_ref = self.decoder(x_ref, features_ref)  #bs,16,224,224
-        # print('x3:',x.shape)
         logits = self.segmentation_head(x)  #bs,2,224,224
         logits_ref = self.segmentation_head(x_ref)  #bs,2,224,224
 
@@ -667,14 +623,7 @@ class TransUNet_ours(nn.Module):
         probs_ref = torch.softmax(logits_ref, dim=1)
         ref_mask = probs_ref[:, 1:2, :, :]  # (bs, 1, 224, 224)
 
-        # ori_mask = torch.argmax(logits, dim=1).unsqueeze(1)  #bs,1,224,224
-        # ref_mask = torch.argmax(logits_ref, dim=1).unsqueeze(1)  #bs,1,224,224
 
-        # print('ori_mask:',ori_mask.shape,ori_mask.min(),ori_mask.max())
-        # print('mask_ref:',mask_ref.shape,mask_ref.min(),mask_ref.max())
-        # print('ori_image:',ori_image.shape,ori_image.min(),ori_image.max())
-        # raise Exception
-        # new_image = torch.cat([ori_image, ori_mask, ref_image, ref_mask, ref_gt], dim=1)  #bs,5,224,224
         target_image = torch.cat([ori_image, ori_mask], dim=1)  #bs,2,224,224
         ref_image = torch.cat([ref_image, ref_mask, ref_gt], dim=1)  #bs,3,224,224
         preds_all = []  
@@ -695,10 +644,6 @@ class TransUNet_ours(nn.Module):
 
             final_pred = self.refinement_module(target_2ch, ref_image)
             preds_all.append(final_pred)
-        # print('final_pred:',final_pred.shape)
-        # print('logits:',logits.shape)
-        # raise Exception
-        # return logits
         return {"final": final_pred, "iters": preds_all}
 
         # return final_pred

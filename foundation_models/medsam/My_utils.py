@@ -24,8 +24,6 @@ from vit_seg_modeling_resnet_skip import ResNetV2, ResNetV3
 class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, middle slice as reference
     def __init__(self, base_dir, mode):
         
-        # self.split = split
-        # self.sample_list = open(os.path.join(list_dir, self.split+'.txt')).readlines()
         self.data_dir = base_dir
         
         self.dataset = base_dir.split('/')[-1]
@@ -44,11 +42,9 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
         image_paths = []
         mask_paths = []
         ct_dir = os.path.join(self.data_dir, self.mode, "CT")
-        # mask_dir = os.path.join(self.root_dir, "Mask")
         
         for patient_folder in os.listdir(ct_dir):
             patient_ct_folder = os.path.join(ct_dir, patient_folder)
-            # patient_mask_folder = os.path.join(mask_dir, patient_folder)
             for ct_filename in os.listdir(patient_ct_folder):
                 ct_path = os.path.join(patient_ct_folder, ct_filename)
                 mask_path = ct_path.replace('CT', 'Mask')
@@ -66,19 +62,9 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
         image_path = self.image_paths[idx]
         mask_path = self.mask_paths[idx]
         img_name = os.path.basename(image_path)
-        # print('image_path:', image_path)
-        # print('mask_path:', mask_path)
-        # raise Exception
-        # image = Image.open(image_path).convert("L")
-        # mask = Image.open(mask_path).convert("L")
 
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        # print('image:', image.shape, image.max(), image.min())
-        # print('mask:', mask.shape, mask.max(), mask.min())
-        # # print('image0:', image.shape, image.max(), image.min())
-        # normalize image and mask
-        # image = (image - image.min()) / (image.max() - image.min())
         mask = mask / 255.0
 
 
@@ -108,18 +94,13 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
             )
         
         case_num, slice_num = mask_path.split('/')[-2:]
-        # print('case_num:', case_num)
 
-        # info = self.ref_map.get(case_num, None)
-        # print("[DEBUG] ref_map.get(case_num) =", repr(info), "type =", type(info))
-        # ref_mask_path = os.path.join('./Vol2Flow_me/codes/models',self.dataset,'Vol2Flow_depth:256_M:5_mse',self.dataset+'_result',self.dataset, self.mode, 'Mask',case_num,slice_num)
         # Default to the current slice as its own reference; the JSON lookup
         # below overrides these when it records a usable middle-slice reference.
         ref_image_path = image_path
         ref_mask_path = mask_path
         info = self.ref_map.get(case_num)
         if isinstance(info, dict):
-            # print('info:', info)
             # Prefer the absolute path recorded in the JSON
             cand_ct  = info.get("ct_path")
             cand_msk = info.get("mask_path")  # may be None
@@ -133,20 +114,9 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
             else:
                 print(f"[WARN] middle-slice not found: {cand_msk}. Will fall back to current slice.")
 
-        # dict_path = os.path.join('./Vol2Flow_me/codes/models',self.dataset,'Vol2Flow_depth:256_M:5_mse','annotation_dict_'+self.mode+'.json')
-        # # ref_mask_path = os.path.join('./Sli2Vol/Sli2Vol_result', self.dataset, case_num, slice_num)
-        # # dict_path = os.path.join('./Sli2Vol/result', self.dataset+'_train', 'annotation_dict_'+self.mode+'.json')
-        # with open(dict_path, 'r') as f:
-        #     dict = json.load(f)
-        # folder_name = os.path.dirname(mask_path)
-        # # if not os.path.exists(ref_mask_path):
-        # ref_mask_path = dict[folder_name]
-        # print('ref_mask_path:', ref_mask_path,"mask_path:", mask_path)
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        # ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
         ref_mask = ref_mask / 255.0
         ref_x, ref_y = ref_mask.shape
-        # ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
         ref_mask_1024 = transform.resize(
                 ref_mask,
                 (1024,1024),
@@ -155,41 +125,16 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
                 mode="constant",
                 anti_aliasing=False,
             )
-        # print('ref_mask_1024:', ref_mask_path, ref_mask_1024.max(), ref_mask_1024.min())
         # y_indices, x_indices = np.where(ref_mask_1024 > 0)
         
         y_indices, x_indices = np.where(ref_mask_1024 > 0)
-        # if len(y_indices) == 0 or len(x_indices) == 0:
-        #     ref_mask_path = dict[folder_name]
-        #     ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
-        # # ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min())
-        #     ref_mask = ref_mask / 255.0
-        #     ref_x, ref_y = ref_mask.shape
-        #     # ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
-        #     ref_mask_1024 = transform.resize(
-        #             ref_mask,
-        #             (1024,1024),
-        #             order=0,
-        #             preserve_range=True,
-        #             mode="constant",
-        #             anti_aliasing=False,
-        #         )
-        #     y_indices, x_indices = np.where(ref_mask_1024 > 0)
             
         x_min, x_max = np.min(x_indices), np.max(x_indices)
         y_min, y_max = np.min(y_indices), np.max(y_indices)
 
        
-        # folder_name = os.path.dirname(mask_path)
-        # dict_path = os.path.join(self.data_dir, 'largest_slice.json')
-        # with open(dict_path, 'r') as f:
-        #     dict = json.load(f)
-        # ref_mask_path = dict[folder_name]
         ref_image_path = ref_mask_path.replace('Mask', 'CT')
-        # print('ref_image_path:', ref_image_path)
-        # print('ref_mask_path:', ref_mask_path)
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
         
         if len(ref_image.shape) == 2:
             ref_img_3c = np.repeat(ref_image[:, :, None], 3, axis=-1)
@@ -218,7 +163,6 @@ class Dataset_middle(Dataset):   #use middle slice GT to extract box prompt, mid
             # Use the second-to-last directory name as case_name
        
         # Print every key in the sample dict
-        # print('sample:', sample.keys())
         return (
             torch.tensor(img_1024).float(),
             torch.tensor(mask_1024[None, :, :]).float(),
@@ -410,8 +354,6 @@ class refinement(nn.Module):
         f0 = f0.permute(0, 3, 1, 2)  # (bs,64,64,768) to (bs,768,64,64)
         f1 = f1.permute(0, 3, 1, 2)
         f2 = f2.permute(0, 3, 1, 2)
-        # print('original_mask:', original_mask.shape, original_mask.max(), original_mask.min())
-        # print('pseudo_mask:', pseudo_mask.shape, pseudo_mask.max(), pseudo_mask.min())
 
         # Initial mask-feature extraction
         ori_feat = F.relu(self.ori_feat_conv(original_mask))          # (bs,32,H,W)
@@ -456,7 +398,6 @@ class MedSAM(nn.Module):
     def forward(self, image, box, ref_mask):
         image_embedding, features = self.image_encoder(image)  # (B, 256, 64, 64)
         f0, f1, f2 = features  # bs,64,64,768
-        # print('f0:', f0.shape, 'f1:', f1.shape, 'f2:', f2.shape)
         # do not compute gradients for prompt encoder
         with torch.no_grad():
             box_torch = torch.as_tensor(box, dtype=torch.float32, device=image.device)
@@ -561,17 +502,6 @@ class Decoder_AlignPlusConf(nn.Module):
     def forward(self, t1, t2, t3, x_tar, r1, r2, r3, x_ref=None, confs=None):
         assert confs is not None and len(confs) == 3, "need confs=(conf_112, conf_56, conf_28)"
         conf_112, conf_56, conf_28 = confs
-        # print('conf_112:', conf_112.shape, conf_112.max(), conf_112.min())  #bs,1,112,112
-        # print('conf_56:', conf_56.shape, conf_56.max(), conf_56.min())  #bs,1,56,56
-        # print('conf_28:', conf_28.shape, conf_28.max(), conf_28.min())  #bs,1,28,28
-        # print('x_tar:', x_tar.shape, x_tar.max(), x_tar.min())  #bs,1024,64,64, previously 14,14
-        # print('x_ref:', x_ref.shape, x_ref.max(), x_ref.min())  #bs,1024,64,64
-        # print('t1:', t1.shape, t1.max(), t1.min()) #bs,64,512,512
-        # print('t2:', t2.shape, t2.max(), t2.min()) #bs,256,256,256
-        # print('t3:', t3.shape, t3.max(), t3.min())  #bs,512,128,128
-        # print('r1:', r1.shape, r1.max(), r1.min())
-        # print('r2:', r2.shape, r2.max(), r2.min())
-        # print('r3:', r3.shape, r3.max(), r3.min())
 
         x = self.init_fuse(x_tar)                        #(B,1024,64,64) -> (B,512,64,64)    # (B,512,14,14)
 
@@ -673,24 +603,13 @@ class TRACE(nn.Module):   #
         self.num_classes = num_classes
         self.zero_head = zero_head
         self.classifier = config.classifier
-        # self.transformer = Transformer2(config, img_size, vis)
-        # self.embeddings = Embeddings3(config, img_size)
         self.target_encoder = target_encoder_resnet(config, img_size, pretrained=pretrained)
         self.reference_encoder = reference_encoder_resnet(config, img_size, pretrained=pretrained)
         self.decoder = Decoder_AlignPlusConf()
 
-        # self.segmentation_head = SegmentationHead(
-        #     in_channels=config['decoder_channels'][-1],
-        #     out_channels=config['n_classes'],
-        #     kernel_size=3,
-        # )
         self.config = config
 
     def forward(self, target, reference):
-        # if x.size()[1] == 1:
-        #     x = x.repeat(1,5,1,1)
-        # x, attn_weights, features = self.transformer(x)  # (B, n_patch, hidden)
-        # print('x:',x.shape)
         # Reference input = [ref_image, ref_mask, ref_gt], shape (B,3,224,224)
         ref_mask = reference[:, 1:2]   # (B,1,224,224)
         ref_gt   = reference[:, 2:3]   # (B,1,224,224)
@@ -704,18 +623,7 @@ class TRACE(nn.Module):   #
 )
 
         
-        # print('x:',x.shape) (bs,1024,14,14)
-        # print('len:',len(features))
-        # print('features:',features[0].shape) (bs,512,28,28)
-        # print('features:',features[1].shape) (bs,256,56,56)
-        # print('features:',features[2].shape) (bs,64,112,112)
-#         logits = self.decoder(
-#     features_tar[2], features_tar[1], features_tar[0], x_tar,
-#     features_ref[2], features_ref[1], features_ref[0], x_ref
-# )
 
-        # logits = self.decoder(features[2], features[1], features[0], x)
-        # logits = self.segmentation_head(x)
         return logits
 class MedSAM_with_TRACE(nn.Module):
     def __init__(
@@ -742,7 +650,6 @@ class MedSAM_with_TRACE(nn.Module):
         image_embedding, features = self.image_encoder(image)  # (B, 256, 64, 64)
         ref_image_embedding, ref_features = self.image_encoder(ref_image)  # (B, 256, 64, 64)
         # f0, f1, f2 = features  # bs,64,64,768
-        # print('f0:', f0.shape, 'f1:', f1.shape, 'f2:', f2.shape)
         # do not compute gradients for prompt encoder
         with torch.no_grad():
             box_torch = torch.as_tensor(box, dtype=torch.float32, device=image.device)
@@ -767,9 +674,6 @@ class MedSAM_with_TRACE(nn.Module):
             mode="bilinear",
             align_corners=False,
         )
-        # print('ori_res_masks:', ori_res_masks.shape, ori_res_masks.max(), ori_res_masks.min())
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('image:', image.shape, image.max(), image.min())
         ori_mask = torch.sigmoid(ori_res_masks)  # (bs, 1, 1024, 1024)
         
 
@@ -786,17 +690,8 @@ class MedSAM_with_TRACE(nn.Module):
             mode="bilinear",
             align_corners=False,
         )
-        # print('ori_res_masks:', ori_res_masks.shape, ori_res_masks.max(), ori_res_masks.min())
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('image:', image.shape, image.max(), image.min())
         ori_mask = torch.sigmoid(ori_res_masks)  # (bs, 1, 1024, 1024)
         ref_mask = torch.sigmoid(ori_res_ref_masks)
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
-        # print('ori_mask:', ori_mask.shape, ori_mask.max(), ori_mask.min())
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
-        # print('image:', image.shape, image.max(), image.min())
-        # print('ref_gt:', ref_gt.shape, ref_gt.max(), ref_gt.min())
-        # new_image = torch.cat([image[:,0:1,:,:], ori_mask, ref_image[:,0:1,:,:], ref_mask, ref_gt], dim=1)
         target_image = torch.cat([image[:,0:1,:,:], ori_mask], dim=1)  #bs,2,224,224
         ref_3ch = torch.cat([ref_image[:,0:1,:,:], ref_mask, ref_gt], dim=1)  #bs,3,224,224
         preds_all = []  
@@ -805,7 +700,6 @@ class MedSAM_with_TRACE(nn.Module):
 
         for it in range(1, max(1, self.refine_iters) ):
         # Feed the previous iteration's output as the next iteration's target prediction
-            # next_mask = torch.softmax(final_pred, dim=1)[:, 1:2] 
             next_mask = torch.sigmoid(final_pred)
 
             if self.detach_between_iters:
@@ -818,10 +712,6 @@ class MedSAM_with_TRACE(nn.Module):
 
             final_pred = self.refinement(target_2ch, ref_3ch)
             preds_all.append(final_pred)
-        # print('final_pred:',final_pred.shape)
-        # print('logits:',logits.shape)
-        # raise Exception
-        # return logits
         return {"final": final_pred, "iters": preds_all}
 
 # === Upstream MedSAM dataset class (NpyDataset) ===

@@ -40,8 +40,6 @@ class RandomGenerator(object):
             label = zoom(label, (self.output_size[0] / x, self.output_size[1] / y), order=0)
         image = torch.from_numpy(image.astype(np.float32)).unsqueeze(0)
         label = torch.from_numpy(label.astype(np.float32))
-        # print('image:', image.shape, image.max(), image.min())
-        # print('label:', label.shape, label.max(), label.min())
         sample = {'image': image, 'label': label.long()}
         return sample
 def random_rot_flip_all(img, lbl, ref_img, ref_lbl):
@@ -113,8 +111,6 @@ class RandomGenerator_ref(object):
 class Dataset_baseline(Dataset):
     def __init__(self, base_dir, mode, transform=None):
         self.transform = transform  # using transform in torch!
-        # self.split = split
-        # self.sample_list = open(os.path.join(list_dir, self.split+'.txt')).readlines()
         self.data_dir = base_dir
         self.image_paths, self.mask_paths = self._get_image_mask_paths()
         self.mode = mode
@@ -123,11 +119,9 @@ class Dataset_baseline(Dataset):
         image_paths = []
         mask_paths = []
         ct_dir = os.path.join(self.data_dir, "CT")
-        # mask_dir = os.path.join(self.root_dir, "Mask")
         
         for patient_folder in os.listdir(ct_dir):
             patient_ct_folder = os.path.join(ct_dir, patient_folder)
-            # patient_mask_folder = os.path.join(mask_dir, patient_folder)
             for ct_filename in os.listdir(patient_ct_folder):
                 ct_path = os.path.join(patient_ct_folder, ct_filename)
                 mask_path = ct_path.replace('CT', 'Mask')
@@ -144,16 +138,9 @@ class Dataset_baseline(Dataset):
     def __getitem__(self, idx):
         image_path = self.image_paths[idx]
         mask_path = self.mask_paths[idx]
-        # print('image_path:', image_path)
-        # print('mask_path:', mask_path)
-        # raise Exception
-        # image = Image.open(image_path).convert("L")
-        # mask = Image.open(mask_path).convert("L")
 
         image = np.array(Image.open(image_path).convert("L"), dtype=np.float32)
         mask = np.array(Image.open(mask_path).convert("L"), dtype=np.float32)
-        # print('image:', image.shape, image.max(), image.min())
-        # print('mask:', mask.shape, mask.max(), mask.min())
         # # print('image0:', image.shape, image.max(), image.min())
         # normalize image and mask
         image = (image - image.min()) / (image.max() - image.min() + 1e-8)
@@ -163,16 +150,7 @@ class Dataset_baseline(Dataset):
         # if x != self.output_size[0] or y != self.output_size[1]:
         image = zoom(image, (224 / x, 224 / y), order=3)  # why not 3?
         mask = zoom(mask, (224 / x, 224 / y), order=0)
-        # if self.split == "train":
-        #     slice_name = self.sample_list[idx].strip('\n')
-        #     data_path = os.path.join(self.data_dir, slice_name+'.npz')
-        #     data = np.load(data_path)
-        #     image, label = data['image'], data['label']   #512,512  img 0-1 label 0-8
             
-        # else:
-        #     vol_name = self.sample_list[idx].strip('\n')
-        #     filepath = self.data_dir + "/{}.npy.h5".format(vol_name)
-        #     data = h5py.File(filepath)
         #     image, label = data['image'][:], data['label'][:]
         folder_name = os.path.dirname(mask_path)
         dict_path = os.path.join(self.data_dir, 'largest_slice.json')
@@ -180,10 +158,7 @@ class Dataset_baseline(Dataset):
             dict = json.load(f)
         ref_mask_path = dict[folder_name]
         ref_image_path = ref_mask_path.replace('Mask', 'CT')
-        # print('ref_image_path:', ref_image_path)
-        # print('ref_mask_path:', ref_mask_path)
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
         ref_mask = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)
         ref_image = (ref_image - ref_image.min()) / (ref_image.max() - ref_image.min() + 1e-8)
         ref_mask = ref_mask / 255.0
@@ -191,11 +166,8 @@ class Dataset_baseline(Dataset):
         ref_image = zoom(ref_image, (224 / ref_x, 224 / ref_y), order=3)
         
         ref_mask = zoom(ref_mask, (224 / ref_x, 224 / ref_y), order=0)
-        # print('ref_image:', ref_image.shape, ref_image.max(), ref_image.min())
-        # print('ref_mask:', ref_mask.shape, ref_mask.max(), ref_mask.min())
         sample = {'image': image, 'label': mask}
                   
-        # sample = {'image': image, 'label': mask, 'ref_image': ref_image, 'ref_label': ref_mask}
         if self.transform:
             sample = self.transform(sample)
             # Use the second-to-last directory name as case_name
@@ -205,7 +177,6 @@ class Dataset_baseline(Dataset):
         sample['image_path'] = image_path
         sample['orig_size'] = np.array([x, y])  # original H, W before zoom to 224
         # Print every key in the sample dict
-        # print('sample:', sample.keys())
         return sample
 class Dataset_middle(Dataset):   # use middle slice as reference image
     def __init__(self, base_dir, mode, transform=None):
@@ -275,8 +246,6 @@ class Dataset_middle(Dataset):   # use middle slice as reference image
                 ref_mask_path = cand_msk
             else:
                 print(f"[WARN] middle-slice not found: {cand_msk}. Will fall back to current slice.")
-        # print('image_path:', image_path)
-        # print('ref_image_path:', ref_image_path)
         # Load the reference and apply the same preprocessing (unchanged)
         ref_image = np.array(Image.open(ref_image_path).convert("L"), dtype=np.float32)
         ref_mask  = np.array(Image.open(ref_mask_path).convert("L"), dtype=np.float32)

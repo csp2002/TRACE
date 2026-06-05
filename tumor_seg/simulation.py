@@ -1157,23 +1157,7 @@ if __name__ == "__main__":
         sam_model1 = sam_model_registry["vit_b"](checkpoint=medsam_base_ckpt).to(device)
         sam_model2 = sam_model_registry["vit_b"](checkpoint=medsam_base_ckpt).to(device)
 
-        # # --- model1 wrapper ---
-        # model1 = MedSAM_Wrapper(
-        #     image_encoder=sam_model1.image_encoder,
-        #     mask_decoder=sam_model1.mask_decoder,
-        #     prompt_encoder=sam_model1.prompt_encoder,
-        # ).cuda()
-        # model1.load_state_dict(torch.load(ckpt_path1, map_location=device)["model"], strict=True)
 
-        # # --- model2 (with TRACE) ---
-        # refinement_mod = TRACE(config_small, img_size=1024, num_classes=2, pretrained=True)
-        # model2 = MedSAM_with_TRACE(
-        #     image_encoder=sam_model2.image_encoder,
-        #     mask_decoder=sam_model2.mask_decoder,
-        #     prompt_encoder=sam_model2.prompt_encoder,
-        #     refinement=refinement_mod,
-        # ).cuda()
-        # model2.load_state_dict(torch.load(ckpt_path2, map_location=device)["model"], strict=True)
 
         
         # Model1: standard MedSAM (neighbor version, no TRACE)

@@ -27,7 +27,6 @@ def trainer_tumor(args, model, snapshot_path):
     base_lr = args.base_lr
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
-    # max_iterations = args.max_iterations
     if args.ref == 'middle':
         DatasetCls = Dataset_middle
         GenCls = RandomGenerator_ref
@@ -67,7 +66,6 @@ def trainer_tumor(args, model, snapshot_path):
                              worker_init_fn=worker_init_fn)
     valloader = (DataLoader(db_val, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
                  if db_val is not None and len(db_val) > 0 else None)
-    # raise Exception
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()
@@ -141,20 +139,7 @@ def trainer_tumor(args, model, snapshot_path):
                 torch.save(model.state_dict(), best_path)
                 logging.info('[epoch %d] new best val loss = %f -> saved %s' % (epoch_num, val_mean, best_path))
 
-            # if iter_num % 20 == 0:
-            #     image = image_batch[1, 0:1, :, :]
-            #     image = (image - image.min()) / (image.max() - image.min())
-            #     writer.add_image('train/Image', image, iter_num)
-            #     outputs = torch.argmax(torch.softmax(outputs, dim=1), dim=1, keepdim=True)
-            #     writer.add_image('train/Prediction', outputs[1, ...] * 50, iter_num)
-            #     labs = label_batch[1, ...].unsqueeze(0) * 50
-            #     writer.add_image('train/GroundTruth', labs, iter_num)
 
-        # save_interval = 10  # int(max_epoch/6)
-        # if  (epoch_num + 1) % save_interval == 0:
-        #     save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')
-        #     torch.save(model.state_dict(), save_mode_path)
-        #     logging.info("save model to {}".format(save_mode_path))
 
         if epoch_num >= max_epoch - 1:
             save_mode_path = os.path.join(snapshot_path, 'epoch_' + str(epoch_num) + '.pth')

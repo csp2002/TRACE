@@ -62,42 +62,9 @@ def show_box(box, ax):
 
 
         
-# %% sanity test of dataset class
-# tr_dataset = NpyDataset("data/npy/CT_Abd")
-# tr_dataloader = DataLoader(tr_dataset, batch_size=8, shuffle=True)
-# for step, (image, gt, bboxes, names_temp) in enumerate(tr_dataloader):
-#     print(image.shape, gt.shape, bboxes.shape)
-#     # show the example
-#     _, axs = plt.subplots(1, 2, figsize=(25, 25))
-#     idx = random.randint(0, 7)
-#     axs[0].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-#     show_mask(gt[idx].cpu().numpy(), axs[0])
-#     show_box(bboxes[idx].numpy(), axs[0])
-#     axs[0].axis("off")
-#     # set title
-#     axs[0].set_title(names_temp[idx])
-#     idx = random.randint(0, 7)
-#     axs[1].imshow(image[idx].cpu().permute(1, 2, 0).numpy())
-#     show_mask(gt[idx].cpu().numpy(), axs[1])
-#     show_box(bboxes[idx].numpy(), axs[1])
-#     axs[1].axis("off")
-#     # set title
-#     axs[1].set_title(names_temp[idx])
-#     # plt.show()
-#     plt.subplots_adjust(wspace=0.01, hspace=0)
-#     plt.savefig("./data_sanitycheck.png", bbox_inches="tight", dpi=300)
-#     plt.close()
-#     break
 
 # %% set up parser
 parser = argparse.ArgumentParser()
-# parser.add_argument(
-#     "-i",
-#     "--tr_npy_path",
-#     type=str,
-#     default="data/npy/CT_Abd",
-#     help="path to training npy files; two subfolders: gts and imgs",
-# )
 parser.add_argument(
         "--data", default=None, type=str, choices=["kits", "pancreas", "lits", "colon"]
     )
@@ -119,10 +86,6 @@ parser.add_argument(
          "so this just avoids the upstream Facebook-AI download prompt that fires when the basename "
          "is 'sam_vit_b_01ec64.pth' and the file is missing.",
 )
-# parser.add_argument('-device', type=str, default='cuda:0')
-# parser.add_argument(
-#     "--load_pretrain", action='store_false', help="load pretrain model"
-# )
 parser.add_argument("--pretrain_model_path", type=str, default="medsam_vit_b.pth")
 parser.add_argument("--work_dir", type=str, default="./work_dir")
 # train
@@ -156,7 +119,6 @@ if args.task_name is None:
 
 if args.use_wandb:
     import wandb
-    # print("Using wandb to monitor training")
     wandb.login()
     wandb.init(
         project=args.task_name,
@@ -169,8 +131,6 @@ if args.use_wandb:
     )
 # (optional wandb monitoring is gated by --use_wandb above)
 args.task_name = args.task_name + "-" + args.data
-# %% set up model for training
-# device = args.device
 run_id = datetime.now().strftime("%Y%m%d-%H%M")
 model_save_path = join(args.work_dir, args.task_name + "-" + run_id)
 device = torch.device(args.device)
@@ -185,8 +145,6 @@ def main():
     )
 
     sam_model = sam_model_registry[args.model_type](checkpoint=args.checkpoint)
-    # print(type(sam_model))
-    # sam_model = sam_model_registry[args.model_type]
     if args.use_trace:
         config_small = configs.get_r18_s16_config()
         config_small.n_classes = 2
@@ -223,14 +181,6 @@ def main():
     medsam_model = medsam_model.to(device)
     medsam_model.train()
 
-    # print(
-    #     "Number of total parameters: ",
-    #     sum(p.numel() for p in medsam_model.parameters()),
-    # )  # 93735472
-    # print(
-    #     "Number of trainable parameters: ",
-    #     sum(p.numel() for p in medsam_model.parameters() if p.requires_grad),
-    # )  # 93729252
     print(
     "Number of total parameters: {:.2f}M".format(
         sum(p.numel() for p in medsam_model.parameters()) / 1e6
@@ -243,17 +193,11 @@ def main():
     )
     #
 
-    # trainable_params = list(medsam_model.image_encoder.parameters()) + list(medsam_model.mask_decoder.parameters()) + list(medsam_model.refinement.parameters())
-    # trainable_params = filter(lambda p: p.requires_grad, medsam_model.parameters())
     trainable_params = [p for p in medsam_model.parameters() if p.requires_grad]
     #print number of trainable parameters
     optimizer = torch.optim.AdamW(
         trainable_params, lr=args.lr, weight_decay=args.weight_decay
     )
-    # print(
-    #     "Number of trainable parameters: ",
-    #     sum(p.numel() for p in trainable_params if p.requires_grad),
-    # )  # 93729252
     seg_loss = monai.losses.DiceLoss(sigmoid=True, squared_pred=True, reduction="mean")
     # cross entropy loss
     ce_loss = nn.BCEWithLogitsLoss(reduction="mean")
@@ -317,12 +261,6 @@ def main():
     for epoch in range(start_epoch, num_epochs):
         epoch_loss = 0
         for step, (image, gt2D, boxes, ref_img, ref_gt, img_name)  in enumerate(tqdm(train_dataloader)):
-            # print('image:', image.shape, image.max(), image.min())
-            # print('gt2D:', gt2D.shape, gt2D.max(), gt2D.min())
-            # print('boxes:', boxes.shape, boxes.max(), boxes.min())
-            # print('ref_gt:', ref_gt.shape, ref_gt.max(), ref_gt.min())
-            # print('ref_img:', ref_img.shape, ref_img.max(), ref_img.min())
-            # raise Exception
             optimizer.zero_grad()
             boxes_np = boxes.detach().cpu().numpy()
             image, gt2D, ref_img, ref_gt = image.to(device), gt2D.to(device), ref_img.to(device), ref_gt.to(device)
@@ -339,11 +277,8 @@ def main():
                 optimizer.zero_grad()
             else:
                 
-                # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
-                # raise Exception
                 if args.use_trace:
                     # medsam_pred, ori_mask, ref_mask = medsam_model(image, boxes_np, ref_img, ref_gt)
-                    # print('medsam_pred:', medsam_pred.shape, medsam_pred.max(), medsam_pred.min())
                     outputs = medsam_model(image, boxes_np, ref_img, ref_gt)
 
 
@@ -353,7 +288,6 @@ def main():
                         loss_seg += seg_loss(logits_i, gt2D)
                         loss_ce += ce_loss(logits_i, gt2D.float())
                     loss = loss_seg + loss_ce
-                    # print("loss:", loss.item())
                 else:
                     # Baseline MedSAM still has a small refinement module that consumes
                     # the neighbor-slice ref mask, so all three positional args are required;

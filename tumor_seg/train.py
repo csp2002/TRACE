@@ -131,7 +131,6 @@ if __name__ == "__main__":
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
     config_vit = CONFIGS_ViT_seg[args.vit_name]
-    # print('config.patches["grid"]:', config_vit.patches["grid"])
     config_vit.n_classes = args.num_classes
     config_vit.n_skip = args.n_skip
     
@@ -205,7 +204,6 @@ if __name__ == "__main__":
         
     num_params = sum(p.numel() for name, p in net.named_parameters()if 'refinement_module' in name )
     print('Number of parameters in refinement_module:', num_params/1e6, 'M')
-        # raise Exception
     if args.freeze:
         ckpt_folder = snapshot_path.split('/')[-1]
         args.exp_name + dataset_name + str(args.img_size)
@@ -220,6 +218,5 @@ if __name__ == "__main__":
                 param.requires_grad = True
             else:
                 param.requires_grad = False
-    # raise Exception
     trainer = {dataset_name: trainer_tumor,}
     trainer[dataset_name](args, net, snapshot_path)

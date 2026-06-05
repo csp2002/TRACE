@@ -173,8 +173,6 @@ class WindowAttention(nn.Module):
         B_, N, C = x.shape
         qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
-        #q = torch.nn.functional.normalize(q, dim=-1)  
-        #k = torch.nn.functional.normalize(k, dim=-1)
         
         q = q * self.scale
         attn = (q @ k.transpose(-2, -1))
@@ -523,7 +521,6 @@ class PatchEmbed(nn.Module):
             tx = self.projs[i](x)
             xs.append(tx)  
         x = torch.cat(xs, dim=1)
-        #print(x.shape)
         x = self.eca(x).flatten(2).transpose(1, 2)
         if self.norm is not None:
             x = self.norm(x)

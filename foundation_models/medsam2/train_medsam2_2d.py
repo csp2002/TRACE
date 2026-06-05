@@ -112,11 +112,6 @@ def forward_with_box(model, images, boxes, image_size=512, multimask_output=True
 
     # 7. Handle object scores (if needed)
     if model.pred_obj_scores:
-    #     print("pred_obj_scores:", model.pred_obj_scores,
-    #   "obj_logit mean/min/max:",
-    #   object_score_logits.mean().item(),
-    #   object_score_logits.min().item(),
-    #   object_score_logits.max().item())
 
         is_obj_appearing = object_score_logits > 0
         NO_OBJ_SCORE = -1e10
@@ -293,7 +288,6 @@ def train_one_epoch(model, dataloader, optimizer, device, epoch, use_amp=False, 
         # Update the progress bar
         pbar.set_postfix({
             'loss': f'{total_loss_val.item():.4f}',
-            # 'p_focal': f'{focal_loss.item():.3e}',
 
             'focal': f'{focal_loss.item():.4f}',
             'dice': f'{dice_loss_val.item():.4f}'

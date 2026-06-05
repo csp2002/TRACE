@@ -59,14 +59,10 @@ def inference(args, model, test_save_path=None):
             outputs = model(image, ref_image, ref_mask)
         else:
             outputs = model(image)
-        # print('outputs:', outputs.shape, outputs.max(), outputs.min())   (1,2,224,224)
-        # raise Exception
         if isinstance(outputs, dict):
             outputs = outputs['final']
         out = torch.argmax(torch.softmax(outputs, dim=1), dim=1)
-        # out = out.cpu().detach().numpy()
 
-        # out= ref_mask.squeeze(1)  # (1,224,224)  #used when using only reference mask as output
 
         # Resize prediction and label back to original resolution before computing metrics
         orig_img = Image.open(image_path[0]).convert("L")
@@ -87,30 +83,18 @@ def inference(args, model, test_save_path=None):
         total_dice += dice
 
         #save the image slice by slice, do not use test_single_volume
-        # print('image_path:', image_path)
-        # print('test_save_path:', test_save_path)
         
-        # print('folder:', folder)
-        # raise Exception
         if test_save_path is not None:
             save_folder = os.path.join(test_save_path, image_path[0].split('/')[-2])
             os.makedirs(save_folder, exist_ok=True)
             save_path = os.path.join(save_folder, image_path[0].split('/')[-1])
             prediction = (out.squeeze().cpu().numpy() * 255).astype(np.uint8)
             Image.fromarray(prediction).save(save_path)
-            # print('save_path:', save_path)
             
             
 
 
 
-        # metric_i = test_single_volume(image, label, model, classes=args.num_classes, patch_size=[args.img_size, args.img_size],
-        #                               test_save_path=test_save_path, case=case_name, z_spacing=args.z_spacing)
-        # metric_list += np.array(metric_i)
-        # logging.info('idx %d case %s mean_dice %f mean_hd95 %f' % (i_batch, case_name, np.mean(metric_i, axis=0)[0], np.mean(metric_i, axis=0)[1]))
-    # metric_list = metric_list / len(db_test)
-    # for i in range(1, args.num_classes):
-    #     logging.info('Mean class %d mean_dice %f mean_hd95 %f' % (i, metric_list[i-1][0], metric_list[i-1][1]))
     avg_iou = total_iou / len(db_test)
     avg_dice = total_dice / len(db_test)
     
@@ -182,8 +166,6 @@ if __name__ == "__main__":
     dataset_name = args.dataset
     args.num_classes = dataset_config[dataset_name]['num_classes']
     args.root_path = dataset_config[dataset_name]['root_path']
-    # args.volume_path = dataset_config[dataset_name]['volume_path']
-    # args.Dataset = dataset_config[dataset_name]['Dataset']
     if args.test_ref == 'middle':
         args.Dataset = Dataset_middle
     elif args.test_ref == 'neighbor':
@@ -206,13 +188,10 @@ if __name__ == "__main__":
     snapshot_path = snapshot_path + '_skip' + str(args.n_skip)
     snapshot_path = snapshot_path + '_vitpatch' + str(args.vit_patches_size) if args.vit_patches_size!=16 else snapshot_path
     snapshot_path = snapshot_path + '_epo' + str(args.max_epochs) if args.max_epochs != 30 else snapshot_path
-    # if dataset_name == 'ACDC':  # using max_epoch instead of iteration to control training duration
-    #     snapshot_path = snapshot_path + '_' + str(args.max_iterations)[0:2] + 'k' if args.max_iterations != 30000 else snapshot_path
     snapshot_path = snapshot_path+'_bs'+str(args.batch_size)
     snapshot_path = snapshot_path + '_lr' + str(args.base_lr) if args.base_lr != 0.01 else snapshot_path
     snapshot_path = snapshot_path + '_'+str(args.img_size)
     snapshot_path = snapshot_path + '_s'+str(args.seed) if args.seed!=1234 else snapshot_path
-    # snapshot_path = snapshot_path + '_deep_supervision' if args.deep_supervision else snapshot_path
     config_vit = CONFIGS_ViT_seg[args.vit_name]
     config_vit.n_classes = args.num_classes
     config_vit.n_skip = args.n_skip
@@ -257,10 +236,6 @@ if __name__ == "__main__":
     snapshot = os.path.join(snapshot_path, 'best_model.pth')
     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', 'epoch_'+str(args.max_epochs-1))
     net.load_state_dict(torch.load(snapshot))
-    # raise Exception
-    # num_params = sum(p.numel() for p in net.parameters() if 'fusion' not in p.name and 'refinement' not in p.name)
-    # print('Number of parameters:', num_params)
-    # raise Exception
 
     
     snapshot_name = snapshot_path.split('/')[-1]
